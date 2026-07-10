@@ -1,3 +1,8 @@
+@props([
+    'heading' => 'Dashboard',
+    'title' => 'AI Marketing Agents',
+])
+
 <!doctype html>
 <html lang="en">
 <head>

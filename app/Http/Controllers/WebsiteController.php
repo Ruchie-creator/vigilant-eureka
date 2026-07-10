@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use App\Models\GoogleAccount;
 use App\Services\SafeUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class WebsiteController extends Controller
@@ -35,7 +37,21 @@ class WebsiteController extends Controller
     public function show(Website $website): View
     {
         return view('websites.show', [
-            'website' => $website->load(['seoAudits' => fn ($query) => $query->latest()->limit(8), 'aiInsights' => fn ($query) => $query->latest()->limit(8), 'marketingTasks' => fn ($query) => $query->latest()->limit(8)]),
+            'website' => $website->load([
+                'searchConsoleSite',
+                'seoAudits' => fn ($query) => $query->latest()->limit(8),
+                'aiInsights' => fn ($query) => $query->latest()->limit(8),
+                'marketingTasks' => fn ($query) => $query->latest()->limit(8),
+                'gscQueries' => fn ($query) => $query->latest()->limit(10),
+                'gscPages' => fn ($query) => $query->latest()->limit(10),
+                'gscDevices' => fn ($query) => $query->latest()->limit(10),
+                'growthOpportunities' => fn ($query) => $query->where('status', 'open')->latest()->limit(10),
+            ]),
+            'googleAccount' => GoogleAccount::with('sites')->where('user_id', Auth::id())->where('provider', 'google')->first(),
+            'gscSummary' => $website->gscDailyMetrics()
+                ->where('date', '>=', now()->subDays(28)->toDateString())
+                ->selectRaw('COALESCE(SUM(clicks), 0) as clicks, COALESCE(SUM(impressions), 0) as impressions, COALESCE(AVG(ctr), 0) as ctr, COALESCE(AVG(position), 0) as position')
+                ->first(),
         ]);
     }
 

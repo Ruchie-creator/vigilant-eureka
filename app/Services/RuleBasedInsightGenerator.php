@@ -18,8 +18,9 @@ class RuleBasedInsightGenerator
                 'priority' => 'medium',
                 'category' => 'technical',
                 'recommendation' => 'Run a homepage SEO audit and review the initial indexability findings.',
-                'expected_result' => 'A reliable baseline for future content and technical decisions.',
-            ]);
+            'expected_result' => 'A reliable baseline for future content and technical decisions.',
+            'source' => 'rule_based',
+        ]);
         }
 
         $missing = $audit->missing_fields ?? [];
@@ -37,6 +38,7 @@ class RuleBasedInsightGenerator
             'category' => $category,
             'recommendation' => $audit->recommendations[0] ?? 'Review the homepage against priority healthcare service keywords.',
             'expected_result' => 'Better crawl clarity, stronger search snippets, and a more useful weekly optimization backlog.',
+            'source' => 'rule_based',
         ]);
     }
 }

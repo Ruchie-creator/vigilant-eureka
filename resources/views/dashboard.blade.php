@@ -1,20 +1,28 @@
-<x-layouts.app heading="Dashboard">
-    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+<x-layouts.app heading="AI Website Growth & Conversion Agent">
+    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-            <p class="text-sm font-medium text-slate-500">Total Websites</p>
-            <p class="mt-3 text-4xl font-bold text-navy">{{ $websiteCount }}</p>
+            <p class="text-sm font-medium text-slate-500">Total Clicks</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($totalClicks) }}</p>
         </div>
         <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-            <p class="text-sm font-medium text-slate-500">Latest SEO Checks</p>
-            <p class="mt-3 text-4xl font-bold text-navy">{{ $latestAudits->count() }}</p>
+            <p class="text-sm font-medium text-slate-500">Total Impressions</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($totalImpressions) }}</p>
         </div>
         <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-            <p class="text-sm font-medium text-slate-500">Open Tasks</p>
-            <p class="mt-3 text-4xl font-bold text-navy">{{ $openTasks->count() }}</p>
+            <p class="text-sm font-medium text-slate-500">Average CTR</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($averageCtr, 2) }}%</p>
         </div>
         <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-            <p class="text-sm font-medium text-slate-500">Weekly Report</p>
-            <p class="mt-3 text-lg font-bold text-navy">{{ $latestReport?->status ?? 'Not generated' }}</p>
+            <p class="text-sm font-medium text-slate-500">Average Position</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($averagePosition, 1) }}</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+            <p class="text-sm font-medium text-slate-500">Open Growth Opportunities</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($openGrowthOpportunities) }}</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+            <p class="text-sm font-medium text-slate-500">Pending Conversion Tasks</p>
+            <p class="mt-3 text-4xl font-bold text-navy">{{ number_format($pendingConversionTasks) }}</p>
         </div>
     </div>
 
@@ -42,7 +50,7 @@
                 @forelse ($latestInsights as $insight)
                     <div class="px-5 py-4">
                         <p class="font-semibold">{{ $insight->title }}</p>
-                        <p class="mt-1 text-sm text-slate-500">{{ $insight->website->name }}</p>
+                        <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500"><span>{{ $insight->website->name }}</span><span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $insight->source === 'ai' ? 'bg-teal/10 text-teal' : 'bg-slate-100 text-slate-700' }}">{{ $insight->source === 'ai' ? 'AI' : 'Fallback' }}</span></p>
                     </div>
                 @empty
                     <div class="px-5 py-10 text-center text-sm text-slate-500">Generate an insight from a website audit.</div>

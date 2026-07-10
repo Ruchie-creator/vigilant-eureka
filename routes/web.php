@@ -3,9 +3,11 @@
 use App\Http\Controllers\AiInsightController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GoogleSearchConsoleController;
 use App\Http\Controllers\MarketingTaskController;
 use App\Http\Controllers\SeoAuditController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\WebsiteSearchConsoleController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WeeklyReportController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +25,14 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('websites', WebsiteController::class);
     Route::post('/websites/{website}/audit', [SeoAuditController::class, 'store'])->name('websites.audit');
+    Route::post('/websites/{website}/search-console/site', [WebsiteSearchConsoleController::class, 'assign'])->name('websites.search-console.assign');
+    Route::post('/websites/{website}/search-console/sync', [WebsiteSearchConsoleController::class, 'sync'])->name('websites.search-console.sync');
+    Route::post('/websites/{website}/search-console/disconnect', [WebsiteSearchConsoleController::class, 'disconnect'])->name('websites.search-console.disconnect');
+
+    Route::get('/google/search-console/connect', [GoogleSearchConsoleController::class, 'connect'])->name('google.search-console.connect');
+    Route::get('/google/search-console/callback', [GoogleSearchConsoleController::class, 'callback'])->name('google.search-console.callback');
+    Route::post('/google/search-console/disconnect', [GoogleSearchConsoleController::class, 'disconnect'])->name('google.search-console.disconnect');
+    Route::get('/google/search-console/sites', [GoogleSearchConsoleController::class, 'sites'])->name('google.search-console.sites');
 
     Route::get('/seo-audits', [SeoAuditController::class, 'index'])->name('seo-audits.index');
 
@@ -38,4 +48,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/weekly-reports/{weeklyReport}', [WeeklyReportController::class, 'show'])->name('weekly-reports.show');
 
     Route::get('/settings', SettingsController::class)->name('settings');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
 });

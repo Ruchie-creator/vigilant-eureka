@@ -18,6 +18,7 @@ class AiInsight extends Model
         'recommendation',
         'expected_result',
         'status',
+        'source',
     ];
 
     public function website(): BelongsTo

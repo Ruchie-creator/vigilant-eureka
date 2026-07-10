@@ -6,7 +6,10 @@
                     <div class="flex flex-wrap items-start justify-between gap-4">
                         <div class="max-w-3xl">
                             <h2 class="font-semibold text-navy">{{ $insight->title }}</h2>
-                            <p class="mt-1 text-sm text-slate-500">{{ $insight->website->name }} · {{ ucfirst($insight->priority) }} · {{ str_replace('_', ' ', $insight->category) }}</p>
+                            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                                <span>{{ $insight->website->name }} · {{ ucfirst($insight->priority) }} · {{ str_replace('_', ' ', $insight->category) }}</span>
+                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $insight->source === 'ai' ? 'bg-teal/10 text-teal' : 'bg-slate-100 text-slate-700' }}">{{ $insight->source === 'ai' ? 'AI' : 'Rule-based fallback' }}</span>
+                            </p>
                             <p class="mt-3 text-sm text-slate-700">{{ $insight->summary }}</p>
                             <p class="mt-2 text-sm font-medium text-slate-900">{{ $insight->recommendation }}</p>
                             @if($insight->expected_result)<p class="mt-2 text-sm text-slate-500">Expected result: {{ $insight->expected_result }}</p>@endif
