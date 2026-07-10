@@ -74,4 +74,9 @@ class Website extends Model
     {
         return $this->hasMany(GrowthOpportunity::class);
     }
+
+    public function conversionChecks(): HasMany
+    {
+        return $this->hasMany(ConversionCheck::class);
+    }
 }

@@ -29,17 +29,22 @@ class AiInsightController extends Controller
         try {
             $insight = $aiService->generate($website, $audit, $recentInsights, $recentTasks);
 
-            AiInsight::create([
-                'website_id' => $website->id,
-                'audit_id' => $audit?->id,
-                'title' => $insight['title'],
-                'summary' => $insight['summary'],
-                'priority' => $insight['priority'],
-                'category' => $insight['category'],
-                'recommendation' => $insight['recommendation'],
-                'expected_result' => $insight['expected_result'],
-                'source' => 'ai',
-            ]);
+            AiInsight::updateOrCreate(
+                [
+                    'website_id' => $website->id,
+                    'title' => $insight['title'],
+                    'category' => $insight['category'],
+                    'status' => 'new',
+                ],
+                [
+                    'audit_id' => $audit?->id,
+                    'summary' => $insight['summary'],
+                    'priority' => $insight['priority'],
+                    'recommendation' => $insight['recommendation'],
+                    'expected_result' => $insight['expected_result'],
+                    'source' => 'ai',
+                ]
+            );
 
             return back()->with('success', 'AI insight generated.');
         } catch (\Throwable) {

@@ -33,7 +33,7 @@
             <div class="flex items-center justify-between gap-4 px-5 py-4 lg:px-8">
                 <div>
                     <h1 class="text-xl font-semibold text-navy">{{ $heading ?? 'Dashboard' }}</h1>
-                    <p class="text-sm text-slate-500">Private healthcare marketing monitor. No patient medical data is collected.</p>
+                    <p class="text-sm text-slate-500">AI Growth & Conversion Agent for healthcare websites. No patient medical data is collected.</p>
                 </div>
                 <form method="POST" action="{{ route('logout') }}">@csrf<button class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-teal hover:text-teal">Logout</button></form>
             </div>

@@ -103,6 +103,12 @@ PROMPT;
                 'target_location' => $website->target_location,
             ],
             'latest_seo_audit' => $auditData,
+            'search_console' => [
+                'top_pages' => $website->gscPages()->latest()->limit(8)->get(['page_url', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
+                'top_queries' => $website->gscQueries()->latest()->limit(12)->get(['query', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
+                'devices' => $website->gscDevices()->latest()->limit(5)->get(['device', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
+                'open_growth_opportunities' => $website->growthOpportunities()->where('status', 'open')->orderByDesc('score')->limit(5)->get(['opportunity_type', 'source_type', 'source_value', 'related_page_url', 'score', 'priority', 'problem', 'recommendation'])->toArray(),
+            ],
             'recent_insights' => ($recentInsights ?? collect())->take(5)->map(fn ($insight) => [
                 'title' => $insight->title,
                 'priority' => $insight->priority,
@@ -116,7 +122,25 @@ PROMPT;
             ])->values(),
         ];
 
-        return "Generate one practical marketing insight for this website. Prefer the highest-value next action and avoid duplicating recent work.\n\n".json_encode($payload, JSON_PRETTY_PRINT);
+        return <<<'PROMPT'
+Generate one practical conversion-focused marketing insight for this website.
+
+Use actual Search Console data. Do not give generic advice unless it is directly tied to the website data.
+Use "Google Business Profile", not "Google My Business".
+
+Your answer must cover:
+- What is happening
+- Why it matters
+- Best conversion-focused action
+- Page/query affected
+- Expected result
+- Priority
+- Suggested task
+
+Prefer opportunities that can increase visits or appointment actions.
+
+Website data:
+PROMPT."\n\n".json_encode($payload, JSON_PRETTY_PRINT);
     }
 
     private function validatedInsight(array $data): array

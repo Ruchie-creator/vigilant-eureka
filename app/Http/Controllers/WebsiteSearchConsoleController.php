@@ -6,6 +6,7 @@ use App\Models\GoogleAccount;
 use App\Models\SearchConsoleSite;
 use App\Models\Website;
 use App\Services\GoogleSearchConsoleService;
+use App\Services\ConversionCheckService;
 use App\Services\GrowthOpportunityGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,7 @@ class WebsiteSearchConsoleController extends Controller
         return back()->with('success', 'Search Console property selected.');
     }
 
-    public function sync(Request $request, Website $website, GoogleSearchConsoleService $service, GrowthOpportunityGenerator $opportunities): RedirectResponse
+    public function sync(Request $request, Website $website, GoogleSearchConsoleService $service, GrowthOpportunityGenerator $opportunities, ConversionCheckService $checks): RedirectResponse
     {
         $data = $request->validate([
             'start_date' => ['nullable', 'date'],
@@ -42,6 +43,7 @@ class WebsiteSearchConsoleController extends Controller
         try {
             $summary = $service->syncWebsite($website, $start, $end);
             $created = $opportunities->generate($website, $summary['start'], $summary['end']);
+            $checks->ensureDefaults($website);
 
             return back()->with('success', 'Search data synced. '.$created.' growth opportunities created.');
         } catch (\Throwable $exception) {

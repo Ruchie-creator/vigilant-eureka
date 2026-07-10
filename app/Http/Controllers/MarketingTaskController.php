@@ -79,6 +79,10 @@ class MarketingTaskController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'priority' => ['required', Rule::in(['low', 'medium', 'high'])],
+            'expected_result' => ['nullable', 'string', 'max:5000'],
+            'source_type' => ['nullable', 'string', 'max:100'],
+            'source_value' => ['nullable', 'string', 'max:512'],
+            'related_page_url' => ['nullable', 'string', 'max:512'],
             'status' => ['required', Rule::in(['pending', 'in_progress', 'completed', 'ignored'])],
             'due_date' => ['nullable', 'date'],
         ]);

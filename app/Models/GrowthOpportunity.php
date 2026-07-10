@@ -12,6 +12,11 @@ class GrowthOpportunity extends Model
         'source_type',
         'source_value',
         'source_hash',
+        'score',
+        'intent',
+        'related_page_url',
+        'conversion_action',
+        'ai_summary',
         'clicks',
         'impressions',
         'ctr',
@@ -28,7 +33,7 @@ class GrowthOpportunity extends Model
 
     protected function casts(): array
     {
-        return ['ctr' => 'float', 'position' => 'float', 'date_start' => 'date', 'date_end' => 'date'];
+        return ['ctr' => 'float', 'position' => 'float', 'score' => 'integer', 'date_start' => 'date', 'date_end' => 'date'];
     }
 
     public function website(): BelongsTo

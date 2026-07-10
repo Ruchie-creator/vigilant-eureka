@@ -21,12 +21,34 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'websiteCount' => Website::count(),
+            'connectedWebsiteCount' => Website::whereNotNull('search_console_site_id')->count(),
             'totalClicks' => (int) $metrics->clicks,
             'totalImpressions' => (int) $metrics->impressions,
             'averageCtr' => (float) $metrics->ctr,
             'averagePosition' => (float) $metrics->position,
             'openGrowthOpportunities' => GrowthOpportunity::where('status', 'open')->count(),
             'pendingConversionTasks' => MarketingTask::whereIn('status', ['pending', 'in_progress'])->where('title', 'like', '%booking%')->count(),
+            'topConversionPriority' => GrowthOpportunity::with('website')->where('status', 'open')->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")->orderByDesc('score')->first(),
+            'websiteRows' => Website::withCount(['marketingTasks as pending_tasks_count' => fn ($query) => $query->whereIn('status', ['pending', 'in_progress'])])
+                ->with(['growthOpportunities' => fn ($query) => $query->where('status', 'open')->orderByDesc('score')->limit(1)])
+                ->latest()
+                ->get()
+                ->map(function (Website $website) {
+                    $summary = $website->gscDailyMetrics()
+                        ->where('date', '>=', now()->subDays(28)->toDateString())
+                        ->selectRaw('COALESCE(SUM(clicks), 0) as clicks, COALESCE(SUM(impressions), 0) as impressions, COALESCE(AVG(ctr), 0) as ctr, COALESCE(AVG(position), 0) as position')
+                        ->first();
+
+                    return [
+                        'website' => $website,
+                        'clicks' => (int) ($summary->clicks ?? 0),
+                        'impressions' => (int) ($summary->impressions ?? 0),
+                        'ctr' => (float) ($summary->ctr ?? 0),
+                        'position' => (float) ($summary->position ?? 0),
+                        'top_opportunity' => $website->growthOpportunities->first(),
+                        'pending_tasks' => $website->pending_tasks_count,
+                    ];
+                }),
             'latestAudits' => SeoAudit::with('website')->latest()->limit(5)->get(),
             'openTasks' => MarketingTask::with('website')->whereIn('status', ['pending', 'in_progress'])->latest()->limit(5)->get(),
             'latestInsights' => AiInsight::with('website')->latest()->limit(5)->get(),

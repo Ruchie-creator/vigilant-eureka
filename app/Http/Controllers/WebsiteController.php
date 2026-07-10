@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Website;
 use App\Models\GoogleAccount;
 use App\Services\SafeUrl;
+use App\Services\GrowthOpportunityGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,24 +35,37 @@ class WebsiteController extends Controller
         return redirect()->route('websites.index')->with('success', 'Website added.');
     }
 
-    public function show(Website $website): View
+    public function show(Website $website, GrowthOpportunityGenerator $classifier): View
     {
+        $mobileClicks = (int) $website->gscDevices()->where('device', 'mobile')->latest()->value('clicks');
+        $topPriority = $website->growthOpportunities()->where('status', 'open')->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")->orderByDesc('score')->first();
+
         return view('websites.show', [
             'website' => $website->load([
                 'searchConsoleSite',
                 'seoAudits' => fn ($query) => $query->latest()->limit(8),
-                'aiInsights' => fn ($query) => $query->latest()->limit(8),
+                'aiInsights' => fn ($query) => $query->whereIn('status', ['new', 'reviewed'])->latest()->limit(5),
                 'marketingTasks' => fn ($query) => $query->latest()->limit(8),
-                'gscQueries' => fn ($query) => $query->latest()->limit(10),
-                'gscPages' => fn ($query) => $query->latest()->limit(10),
+                'gscQueries' => fn ($query) => $query->orderByDesc('clicks')->limit(5),
+                'gscPages' => fn ($query) => $query->orderByDesc('clicks')->limit(5),
                 'gscDevices' => fn ($query) => $query->latest()->limit(10),
-                'growthOpportunities' => fn ($query) => $query->where('status', 'open')->latest()->limit(10),
+                'growthOpportunities' => fn ($query) => $query->where('status', 'open')->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")->orderByDesc('score')->limit(5),
+                'conversionChecks' => fn ($query) => $query->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")->limit(10),
             ]),
             'googleAccount' => GoogleAccount::with('sites')->where('user_id', Auth::id())->where('provider', 'google')->first(),
             'gscSummary' => $website->gscDailyMetrics()
                 ->where('date', '>=', now()->subDays(28)->toDateString())
                 ->selectRaw('COALESCE(SUM(clicks), 0) as clicks, COALESCE(SUM(impressions), 0) as impressions, COALESCE(AVG(ctr), 0) as ctr, COALESCE(AVG(position), 0) as position')
                 ->first(),
+            'mobileClicks' => $mobileClicks,
+            'openConversionOpportunities' => $website->growthOpportunities()->where('status', 'open')->whereIn('opportunity_type', ['improve_booking_cta', 'mobile_conversion', 'increase_ctr_and_conversion'])->count(),
+            'topPriority' => $topPriority,
+            'pageRecommendations' => $website->gscPages()->orderByDesc('clicks')->limit(5)->get()->map(fn ($page) => [
+                'page' => $page,
+                'page_type' => $classifier->pageType($page->page_url),
+                'recommendation' => $classifier->conversionRecommendationForPage($page),
+            ]),
+            'queryIntents' => $website->gscQueries()->orderByDesc('impressions')->limit(5)->get()->mapWithKeys(fn ($query) => [$query->id => $classifier->classifyQueryIntent($query->query)]),
         ]);
     }
 

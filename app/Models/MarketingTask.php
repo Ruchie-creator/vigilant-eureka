@@ -10,9 +10,14 @@ class MarketingTask extends Model
     protected $fillable = [
         'website_id',
         'ai_insight_id',
+        'growth_opportunity_id',
         'title',
         'description',
+        'expected_result',
         'priority',
+        'source_type',
+        'source_value',
+        'related_page_url',
         'status',
         'due_date',
     ];

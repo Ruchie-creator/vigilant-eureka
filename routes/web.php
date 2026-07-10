@@ -4,6 +4,7 @@ use App\Http\Controllers\AiInsightController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoogleSearchConsoleController;
+use App\Http\Controllers\GrowthOpportunityController;
 use App\Http\Controllers\MarketingTaskController;
 use App\Http\Controllers\SeoAuditController;
 use App\Http\Controllers\SettingsController;
@@ -40,6 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/websites/{website}/ai-insights', [AiInsightController::class, 'store'])->name('websites.ai-insights.store');
     Route::patch('/ai-insights/{aiInsight}', [AiInsightController::class, 'update'])->name('ai-insights.update');
     Route::post('/ai-insights/{aiInsight}/tasks', [MarketingTaskController::class, 'storeFromInsight'])->name('ai-insights.tasks.store');
+    Route::post('/growth-opportunities/{growthOpportunity}/tasks', [GrowthOpportunityController::class, 'storeTask'])->name('growth-opportunities.tasks.store');
+    Route::patch('/growth-opportunities/{growthOpportunity}', [GrowthOpportunityController::class, 'update'])->name('growth-opportunities.update');
 
     Route::resource('marketing-tasks', MarketingTaskController::class)->except(['show']);
 
