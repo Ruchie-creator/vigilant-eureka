@@ -165,7 +165,7 @@ class GrowthOpportunityGenerator
 
     public function classifyQueryIntent(string $query): string
     {
-        $q = Str::lower($query)->ascii();
+        $q = Str::ascii(Str::lower($query));
 
         if (Str::contains($q, ['thomas baptiste weiss', 'baptiste weiss', 'site:', 'marjorie'])) {
             return 'branded';
@@ -196,7 +196,7 @@ class GrowthOpportunityGenerator
 
     public function mapQueryToPage(string $query, Collection $pages): ?GscPage
     {
-        $q = Str::lower($query)->ascii();
+        $q = Str::ascii(Str::lower($query));
         $map = [
             ['terms' => ['cranio', 'crani', 'sacrale'], 'slug' => 'cranio'],
             ['terms' => ['drainage', 'lymphatique'], 'slug' => 'drainage'],
@@ -208,7 +208,7 @@ class GrowthOpportunityGenerator
 
         foreach ($map as $rule) {
             if (Str::contains($q, $rule['terms'])) {
-                $match = $pages->first(fn (GscPage $page) => Str::contains(Str::lower($page->page_url)->ascii(), $rule['slug']));
+                $match = $pages->first(fn (GscPage $page) => Str::contains(Str::ascii(Str::lower($page->page_url)), $rule['slug']));
                 if ($match) {
                     return $match;
                 }
