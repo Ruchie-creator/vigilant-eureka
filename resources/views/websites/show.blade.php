@@ -61,17 +61,17 @@
     </section>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        @include('websites.partials.growth-opportunities', ['opportunities' => $website->growthOpportunities])
-        @include('websites.partials.conversion-checks', ['checks' => $website->conversionChecks])
+        @include('websites.partials.growth-opportunities', ['opportunities' => $website->relationLoaded('growthOpportunities') ? $website->growthOpportunities : collect()])
+        @include('websites.partials.conversion-checks', ['checks' => $website->relationLoaded('conversionChecks') ? $website->conversionChecks : collect()])
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
         @include('websites.partials.gsc-pages', ['pageRecommendations' => $pageRecommendations])
-        @include('websites.partials.gsc-queries', ['queries' => $website->gscQueries, 'queryIntents' => $queryIntents])
+        @include('websites.partials.gsc-queries', ['queries' => $website->relationLoaded('gscQueries') ? $website->gscQueries : collect(), 'queryIntents' => $queryIntents])
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        @include('websites.partials.gsc-devices', ['devices' => $website->gscDevices])
+        @include('websites.partials.gsc-devices', ['devices' => $website->relationLoaded('gscDevices') ? $website->gscDevices : collect()])
         @include('websites.partials.insights', ['insights' => $website->aiInsights])
     </div>
 
