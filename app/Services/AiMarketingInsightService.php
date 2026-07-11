@@ -8,6 +8,7 @@ use App\Models\Website;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -78,6 +79,23 @@ PROMPT;
 
     private function userPrompt(Website $website, ?SeoAudit $audit, ?Collection $recentInsights, ?Collection $recentTasks): string
     {
+        $classifier = app(GrowthOpportunityGenerator::class);
+        $latestSync = Schema::hasTable('gsc_syncs') ? $website->latestGscSync : null;
+        $queries = $website->gscQueries()->latest()->limit(20)->get(['query', 'clicks', 'impressions', 'ctr', 'position']);
+        $queriesByIntent = $queries->map(function ($query) use ($website, $classifier) {
+            $intent = $classifier->classifyQueryIntent($query->query, $website);
+
+            return [
+                'query' => $query->query,
+                'intent' => $intent,
+                'category' => $classifier->opportunityCategoryForIntent($intent),
+                'clicks' => $query->clicks,
+                'impressions' => $query->impressions,
+                'ctr' => $query->ctr,
+                'position' => $query->position,
+            ];
+        });
+
         $auditData = $audit ? [
             'http_status' => $audit->http_status,
             'page_title' => $audit->page_title,
@@ -101,13 +119,36 @@ PROMPT;
                 'type' => $website->type,
                 'language' => $website->language,
                 'target_location' => $website->target_location,
+                'service_profile' => $website->serviceProfile(),
             ],
             'latest_seo_audit' => $auditData,
             'search_console' => [
-                'top_pages' => $website->gscPages()->latest()->limit(8)->get(['page_url', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
-                'top_queries' => $website->gscQueries()->latest()->limit(12)->get(['query', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
+                'latest_sync' => $latestSync ? [
+                    'property_url' => $latestSync->property_url,
+                    'date_start' => $latestSync->date_start->toDateString(),
+                    'date_end' => $latestSync->date_end->toDateString(),
+                    'search_type' => $latestSync->search_type,
+                    'country_filter' => $latestSync->country_filter,
+                    'device_filter' => $latestSync->device_filter,
+                    'total_clicks' => $latestSync->total_clicks,
+                    'total_impressions' => $latestSync->total_impressions,
+                    'average_ctr' => $latestSync->average_ctr,
+                    'average_position' => $latestSync->average_position,
+                ] : null,
+                'top_pages' => $website->gscPages()->latest()->limit(8)->get(['page_url', 'clicks', 'impressions', 'ctr', 'position'])->map(fn ($page) => [
+                    'page_url' => $page->page_url,
+                    'page_type' => $classifier->pageType($page->page_url, $website),
+                    'is_priority_service_page' => $classifier->isPriorityServicePage($website, $page->page_url),
+                    'clicks' => $page->clicks,
+                    'impressions' => $page->impressions,
+                    'ctr' => $page->ctr,
+                    'position' => $page->position,
+                ])->toArray(),
+                'service_patient_intent_queries' => $queriesByIntent->whereIn('intent', ['service_intent', 'local_service_intent', 'condition_intent'])->values()->all(),
+                'branded_reputation_queries' => $queriesByIntent->whereIn('intent', ['branded_practitioner', 'review_reputation'])->values()->all(),
+                'other_queries' => $queriesByIntent->whereNotIn('intent', ['service_intent', 'local_service_intent', 'condition_intent', 'branded_practitioner', 'review_reputation'])->values()->all(),
                 'devices' => $website->gscDevices()->latest()->limit(5)->get(['device', 'clicks', 'impressions', 'ctr', 'position'])->toArray(),
-                'open_growth_opportunities' => $website->growthOpportunities()->where('status', 'open')->orderByDesc('score')->limit(5)->get(['opportunity_type', 'source_type', 'source_value', 'related_page_url', 'score', 'priority', 'problem', 'recommendation'])->toArray(),
+                'open_growth_opportunities' => $website->growthOpportunities()->where('status', 'open')->orderByDesc('score')->limit(5)->get(['opportunity_type', 'opportunity_category', 'source_type', 'source_value', 'related_page_url', 'score', 'priority', 'intent', 'problem', 'recommendation'])->toArray(),
             ],
             'recent_insights' => ($recentInsights ?? collect())->take(5)->map(fn ($insight) => [
                 'title' => $insight->title,
@@ -125,8 +166,12 @@ PROMPT;
         return <<<'PROMPT'
 Generate one practical conversion-focused marketing insight for this website.
 
-Use actual Search Console data. Do not give generic advice unless it is directly tied to the website data.
+Use actual Search Console data. Mention the Search Console property, date range, and filters when available. Do not give generic advice unless it is directly tied to the website data.
 Use "Google Business Profile", not "Google My Business".
+Separate branded/practitioner-name searches from service or patient-intent searches.
+Prioritize service pages, priority pages, and appointment conversions over branded visibility unless the insight is explicitly about trust or reputation conversion.
+Use the website target location and target_locations exactly. Do not recommend a city or country that is not in the website settings.
+Recommend actions tied to specific pages or query groups.
 
 Your answer must cover:
 - What is happening

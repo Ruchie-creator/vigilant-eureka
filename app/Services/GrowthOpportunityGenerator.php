@@ -29,6 +29,23 @@ class GrowthOpportunityGenerator
             $created += $this->pageRules($website, $page);
         }
 
+        foreach ($this->missingPriorityPages($website, $pages) as $priorityPageUrl) {
+            $created += $this->save($website, [
+                'source_type' => 'page',
+                'source_value' => $priorityPageUrl,
+                'opportunity_type' => 'priority_service_page',
+                'opportunity_category' => 'service_page_growth',
+                'problem' => 'This priority service page represents an offered service but is not prominent in the synced Search Console page data.',
+                'recommendation' => 'Strengthen internal links from the homepage and about page to this service page, then make the appointment CTA clear near the top.',
+                'expected_result' => 'More patients can discover the relevant service path and move toward an appointment action.',
+                'priority' => 'high',
+                'intent' => 'service_intent',
+                'related_page_url' => $priorityPageUrl,
+                'conversion_action' => 'Add stronger internal links and a visible appointment CTA on the service journey.',
+                'score' => 72,
+            ], $this->virtualMetric($start, $end));
+        }
+
         $mobile = GscDevice::where('website_id', $website->id)->where('device', 'mobile')->where('date_start', $start->toDateString())->where('date_end', $end->toDateString())->first();
         $desktop = GscDevice::where('website_id', $website->id)->where('device', 'desktop')->where('date_start', $start->toDateString())->where('date_end', $end->toDateString())->first();
 
@@ -37,13 +54,14 @@ class GrowthOpportunityGenerator
                 'source_type' => 'device',
                 'source_value' => 'mobile',
                 'opportunity_type' => 'mobile_conversion',
-                'problem' => 'Mobile search performance is stronger than desktop, so the mobile appointment path matters most.',
-                'recommendation' => 'Prioritize mobile-first booking experience: sticky appointment button, tap-to-call, shorter intro, and a clear appointment section.',
+                'opportunity_category' => 'conversion_improvement',
+                'problem' => 'Mobile search performance is strong, so the mobile appointment path matters most.',
+                'recommendation' => 'Prioritize the mobile booking experience: sticky appointment button, tap-to-call, shorter intro, and a clear appointment section.',
                 'expected_result' => 'More appointment actions from mobile visitors.',
                 'priority' => 'high',
-                'intent' => 'patient_intent',
+                'intent' => 'local_service_intent',
                 'conversion_action' => 'Improve mobile booking CTA and tap-to-call path.',
-                'score' => $this->score($mobile, 'device', 'patient_intent', null, true),
+                'score' => $this->score($mobile, 'device', 'local_service_intent', null, true),
             ], $mobile);
         }
 
@@ -53,40 +71,74 @@ class GrowthOpportunityGenerator
     private function queryRules(Website $website, GscQuery $query, Collection $pages): int
     {
         $created = 0;
-        $intent = $this->classifyQueryIntent($query->query);
-        $relatedPage = $this->mapQueryToPage($query->query, $pages);
-        $pageType = $relatedPage ? $this->pageType($relatedPage->page_url) : 'unknown';
-        $isUsefulIntent = in_array($intent, ['patient_intent', 'local_service'], true) || ($intent === 'informational' && $pageType === 'service_page');
+        $intent = $this->classifyQueryIntent($query->query, $website);
+        $relatedPage = $this->mapQueryToPage($query->query, $pages, $website);
+        $pageType = $relatedPage ? $this->pageType($relatedPage->page_url, $website) : 'unknown';
+        $isServiceIntent = in_array($intent, ['service_intent', 'local_service_intent', 'condition_intent'], true);
 
-        if (in_array($intent, ['branded', 'competitor', 'irrelevant'], true)) {
+        if (in_array($intent, ['competitor', 'irrelevant', 'unknown'], true)) {
             return 0;
         }
 
-        if ($query->impressions >= 30 && $query->ctr < 2 && $query->position <= 15 && $isUsefulIntent) {
-            $created += $this->save($website, [
+        if ($intent === 'review_reputation') {
+            return $this->save($website, [
                 'source_type' => 'query',
                 'source_value' => $query->query,
-                'opportunity_type' => 'increase_ctr',
-                'problem' => 'This patient-intent query has visibility but a low click-through rate.',
-                'recommendation' => $relatedPage
-                    ? 'Rewrite the title/meta for patient intent and align the page intro with the search need.'
-                    : 'Create or strengthen a page for this search intent, then write a patient-focused title and meta description.',
-                'expected_result' => 'More visits from existing impressions and a clearer path toward appointment actions.',
-                'priority' => $query->impressions >= 50 && $query->position <= 12 ? 'high' : 'medium',
+                'opportunity_type' => 'review_trust_path',
+                'opportunity_category' => 'reputation_conversion',
+                'problem' => 'This search is reputation-led rather than service-discovery-led.',
+                'recommendation' => 'Strengthen trust signals, review visibility, credentials, and the appointment path on the relevant about or practitioner page.',
+                'expected_result' => 'Visitors who already know the practitioner can reach a confident booking decision faster.',
+                'priority' => 'medium',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Add or improve an appointment CTA near the top of the mapped page.',
+                'conversion_action' => 'Add trust proof and a clear booking CTA near practitioner information.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
 
-        if ($isUsefulIntent && $query->position >= 5 && $query->position <= 12 && $query->impressions >= 10) {
+        if ($intent === 'branded_practitioner') {
+            return $this->save($website, [
+                'source_type' => 'query',
+                'source_value' => $query->query,
+                'opportunity_type' => 'branded_practitioner_conversion',
+                'opportunity_category' => 'branded_visibility',
+                'problem' => 'This practitioner-name search is useful for trust and conversion but should not dominate acquisition growth.',
+                'recommendation' => 'Improve the about/practitioner page with credentials, appointment CTA, and links to the most relevant service pages.',
+                'expected_result' => 'Known-name visitors can convert more easily while service pages carry acquisition growth.',
+                'priority' => 'medium',
+                'intent' => $intent,
+                'related_page_url' => $relatedPage?->page_url,
+                'conversion_action' => 'Connect branded traffic to service pages and appointment actions.',
+                'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
+            ], $query);
+        }
+
+        if ($query->impressions >= 30 && $query->ctr < 2 && $query->position <= 15 && $isServiceIntent) {
             $created += $this->save($website, [
                 'source_type' => 'query',
                 'source_value' => $query->query,
-                'opportunity_type' => 'improve_position',
-                'problem' => 'This patient-intent query is close to stronger visibility but needs more authority and relevance.',
-                'recommendation' => 'Strengthen the mapped service page with better headings, internal links, local Lyon relevance, and a booking CTA.',
+                'opportunity_type' => 'increase_service_ctr',
+                'opportunity_category' => 'acquisition_growth',
+                'problem' => 'This service or patient-intent query has visibility but a low click-through rate.',
+                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite the title/meta for patient intent and align the page intro with the search need.'),
+                'expected_result' => 'More visits from existing service impressions and a clearer path toward appointment actions.',
+                'priority' => $query->impressions >= 50 && $query->position <= 12 ? 'high' : 'medium',
+                'intent' => $intent,
+                'related_page_url' => $relatedPage?->page_url,
+                'conversion_action' => 'Add or improve an appointment CTA near the top of the mapped service page.',
+                'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
+            ], $query);
+        }
+
+        if ($isServiceIntent && $query->position >= 5 && $query->position <= 12 && $query->impressions >= 10) {
+            $created += $this->save($website, [
+                'source_type' => 'query',
+                'source_value' => $query->query,
+                'opportunity_type' => 'improve_service_position',
+                'opportunity_category' => 'service_page_growth',
+                'problem' => 'This service query is close to stronger visibility but needs more authority and relevance.',
+                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Strengthen the mapped service page with better headings, internal links, target-location relevance, and a booking CTA.'),
                 'expected_result' => 'The page may earn more clicks from relevant visitors already searching for this service.',
                 'priority' => 'high',
                 'intent' => $intent,
@@ -96,14 +148,15 @@ class GrowthOpportunityGenerator
             ], $query);
         }
 
-        if ($query->impressions >= 20 && $query->clicks === 0 && $isUsefulIntent) {
+        if ($query->impressions >= 20 && $query->clicks === 0 && ($isServiceIntent || ($intent === 'informational' && $pageType === 'service_page'))) {
             $created += $this->save($website, [
                 'source_type' => 'query',
                 'source_value' => $query->query,
-                'opportunity_type' => 'update_existing_page',
+                'opportunity_type' => 'service_query_no_clicks',
+                'opportunity_category' => $isServiceIntent ? 'acquisition_growth' : 'service_page_growth',
                 'problem' => 'This useful query is visible in search but has not produced clicks.',
                 'recommendation' => $relatedPage
-                    ? 'Rewrite title/meta, improve intent match, and add a stronger appointment CTA.'
+                    ? $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite title/meta, improve intent match, and add a stronger appointment CTA.')
                     : 'Create or strengthen a page for this search intent.',
                 'expected_result' => 'The search result can better match patients looking for this topic.',
                 'priority' => $intent === 'informational' ? 'medium' : 'high',
@@ -120,27 +173,30 @@ class GrowthOpportunityGenerator
     private function pageRules(Website $website, GscPage $page): int
     {
         $created = 0;
-        $type = $this->pageType($page->page_url);
+        $type = $this->pageType($page->page_url, $website);
 
         if ($type === 'legal') {
             return 0;
         }
 
-        if ($page->clicks >= 3) {
+        if ($page->clicks >= 3 || $this->isPriorityServicePage($website, $page->page_url)) {
             $created += $this->save($website, [
                 'source_type' => 'page',
                 'source_value' => $page->page_url,
-                'opportunity_type' => 'improve_booking_cta',
-                'problem' => 'This page already receives search traffic. It should be optimized to convert visitors into appointment actions.',
+                'opportunity_type' => $type === 'service_page' ? 'service_page_conversion' : 'improve_booking_cta',
+                'opportunity_category' => $type === 'service_page' ? 'service_page_growth' : 'conversion_improvement',
+                'problem' => $type === 'service_page'
+                    ? 'This service page can support acquisition and appointment conversion.'
+                    : 'This page receives search traffic and should guide visitors toward appointment actions.',
                 'recommendation' => $type === 'blog'
                     ? 'Add a contextual link from this content to the relevant service page and include a soft appointment CTA.'
-                    : 'Add or improve booking CTA above the fold, repeat appointment button after key sections, and track booking clicks.',
+                    : 'Improve the page-specific appointment CTA, repeat it after key sections, and link to the most relevant service journey.',
                 'expected_result' => 'More appointment actions from existing traffic.',
                 'priority' => $type === 'service_page' ? 'high' : 'medium',
-                'intent' => $type === 'service_page' ? 'patient_intent' : 'informational',
+                'intent' => $type === 'service_page' ? 'service_intent' : 'informational',
                 'related_page_url' => $page->page_url,
-                'conversion_action' => $this->conversionRecommendationForPage($page),
-                'score' => $this->score($page, 'page', $type === 'service_page' ? 'patient_intent' : 'informational', $page->page_url),
+                'conversion_action' => $this->conversionRecommendationForPage($page, $website),
+                'score' => $this->score($page, 'page', $type === 'service_page' ? 'service_intent' : 'informational', $page->page_url),
             ], $page);
         }
 
@@ -148,30 +204,45 @@ class GrowthOpportunityGenerator
             $created += $this->save($website, [
                 'source_type' => 'page',
                 'source_value' => $page->page_url,
-                'opportunity_type' => 'increase_ctr_and_conversion',
+                'opportunity_type' => 'increase_service_page_ctr',
+                'opportunity_category' => 'service_page_growth',
                 'problem' => 'This service page has strong visibility, low CTR, and conversion potential.',
                 'recommendation' => 'Rewrite title/meta for patient intent and improve the landing page appointment CTA.',
                 'expected_result' => 'More clicks from existing impressions and more appointment actions from visitors.',
                 'priority' => 'high',
-                'intent' => 'patient_intent',
+                'intent' => 'service_intent',
                 'related_page_url' => $page->page_url,
                 'conversion_action' => 'Improve title/meta and above-the-fold booking CTA.',
-                'score' => $this->score($page, 'page', 'patient_intent', $page->page_url),
+                'score' => $this->score($page, 'page', 'service_intent', $page->page_url),
             ], $page);
         }
 
         return $created;
     }
 
-    public function classifyQueryIntent(string $query): string
+    public function classifyQueryIntent(string $query, ?Website $website = null): string
     {
-        $q = Str::ascii(Str::lower($query));
+        $q = $this->normalize($query);
+        $profile = $website?->serviceProfile() ?? [];
+        $names = $this->normalizedList($profile['practitioner_names'] ?? []);
+        $brandTerms = $this->normalizedList($profile['brand_terms'] ?? []);
+        $services = $this->normalizedList($profile['primary_services'] ?? []);
+        $locations = $this->normalizedList($profile['target_locations'] ?? []);
 
-        if (Str::contains($q, ['thomas baptiste weiss', 'baptiste weiss', 'site:', 'marjorie'])) {
-            return 'branded';
+        $hasName = $this->containsAny($q, $names);
+        $hasService = $this->containsAny($q, array_merge($services, $this->serviceTerms()));
+        $hasLocation = $this->containsAny($q, $locations);
+        $hasCondition = $this->containsAny($q, $this->conditionTerms());
+
+        if ($hasName && Str::contains($q, ['avis', 'review', 'opinion', 'temoignage'])) {
+            return 'review_reputation';
         }
 
-        if (Str::contains($q, ['ikopositive', 'doctolib', 'pages jaunes', 'mappy'])) {
+        if ($hasName || $this->containsAny($q, $brandTerms)) {
+            return 'branded_practitioner';
+        }
+
+        if (Str::contains($q, ['doctolib', 'pages jaunes', 'mappy', 'site:', 'linkedin'])) {
             return 'competitor';
         }
 
@@ -179,12 +250,16 @@ class GrowthOpportunityGenerator
             return 'irrelevant';
         }
 
-        if (Str::contains($q, ['lyon', 'pres de moi', 'rendez vous', 'rdv', 'cabinet'])) {
-            return 'local_service';
+        if ($hasService && $hasLocation) {
+            return 'local_service_intent';
         }
 
-        if (Str::contains($q, ['osteopathe', 'osteopathie', 'drainage lymphatique', 'cranio', 'crani', 'auriculo', 'sexologue', 'therapie', 'sport', 'senior'])) {
-            return 'patient_intent';
+        if ($hasCondition) {
+            return 'condition_intent';
+        }
+
+        if ($hasService || Str::contains($q, ['rendez vous', 'rdv', 'cabinet', 'pres de moi'])) {
+            return $hasLocation ? 'local_service_intent' : 'service_intent';
         }
 
         if (Str::contains($q, ['c est quoi', 'definition', 'comment', 'pourquoi', 'symptome', 'bienfaits', 'danger'])) {
@@ -194,33 +269,60 @@ class GrowthOpportunityGenerator
         return 'unknown';
     }
 
-    public function mapQueryToPage(string $query, Collection $pages): ?GscPage
+    public function opportunityCategoryForIntent(string $intent): string
     {
-        $q = Str::ascii(Str::lower($query));
-        $map = [
-            ['terms' => ['cranio', 'crani', 'sacrale'], 'slug' => 'cranio'],
-            ['terms' => ['drainage', 'lymphatique'], 'slug' => 'drainage'],
-            ['terms' => ['sport'], 'slug' => 'sport'],
-            ['terms' => ['lyon 2', 'lyon-2'], 'slug' => 'lyon-2'],
-            ['terms' => ['senior'], 'slug' => 'senior'],
-            ['terms' => ['osteopathe', 'osteopathie'], 'slug' => 'osteo'],
-        ];
+        return match ($intent) {
+            'service_intent', 'local_service_intent', 'condition_intent' => 'acquisition_growth',
+            'review_reputation' => 'reputation_conversion',
+            'branded_practitioner' => 'branded_visibility',
+            'competitor', 'irrelevant', 'unknown' => 'low_value',
+            default => 'conversion_improvement',
+        };
+    }
 
-        foreach ($map as $rule) {
-            if (Str::contains($q, $rule['terms'])) {
-                $match = $pages->first(fn (GscPage $page) => Str::contains(Str::ascii(Str::lower($page->page_url)), $rule['slug']));
+    public function mapQueryToPage(string $query, Collection $pages, ?Website $website = null): ?GscPage
+    {
+        $q = $this->normalize($query);
+        $profile = $website?->serviceProfile() ?? [];
+        $priorityPages = $profile['priority_pages'] ?? [];
+
+        foreach ($priorityPages as $priorityPage) {
+            $priorityPath = $this->normalize(parse_url($priorityPage, PHP_URL_PATH) ?: $priorityPage);
+            if ($this->containsAny($priorityPath, explode(' ', $q)) || $this->containsAny($q, explode('-', str_replace('/', ' ', $priorityPath)))) {
+                $match = $pages->first(fn (GscPage $page) => $this->sameUrl($page->page_url, $priorityPage));
                 if ($match) {
                     return $match;
                 }
             }
         }
 
-        return $pages->sortByDesc('clicks')->first();
+        $map = [
+            ['terms' => ['cranio', 'crani', 'sacrale'], 'slug' => 'cranio'],
+            ['terms' => ['drainage', 'lymphatique'], 'slug' => 'drainage'],
+            ['terms' => ['sport'], 'slug' => 'sport'],
+            ['terms' => ['lyon 2', 'lyon-2'], 'slug' => 'lyon-2'],
+            ['terms' => ['osteopathe', 'osteopathie'], 'slug' => 'osteo'],
+            ['terms' => ['traitement', 'traitements', 'sexologie'], 'slug' => 'traitements-sexologie'],
+            ['terms' => ['ejaculation', 'precoce'], 'slug' => 'ejaculation-precoce'],
+            ['terms' => ['desir', 'libido'], 'slug' => 'desir-sexuel'],
+            ['terms' => ['orgasme'], 'slug' => 'orgasme'],
+        ];
+
+        foreach ($map as $rule) {
+            if (Str::contains($q, $rule['terms'])) {
+                $match = $pages->first(fn (GscPage $page) => Str::contains($this->normalize($page->page_url), $rule['slug']));
+                if ($match) {
+                    return $match;
+                }
+            }
+        }
+
+        return $pages->sortByDesc(fn (GscPage $page) => $this->isPriorityServicePage($website, $page->page_url) ? $page->clicks + 100 : $page->clicks)->first();
     }
 
-    public function pageType(string $url): string
+    public function pageType(string $url, ?Website $website = null): string
     {
-        $path = Str::lower(parse_url($url, PHP_URL_PATH) ?: '/');
+        $path = $this->normalize(parse_url($url, PHP_URL_PATH) ?: '/');
 
         if ($path === '/' || $path === '') {
             return 'homepage';
@@ -234,22 +336,56 @@ class GrowthOpportunityGenerator
             return 'blog';
         }
 
-        if (Str::contains($path, ['osteopath', 'therapie', 'drainage', 'cranio', 'sport', 'senior', 'consultation', 'sexolog', 'auriculo'])) {
+        if ($this->isPriorityServicePage($website, $url) || Str::contains($path, ['traitements', 'sexologie', 'ejaculation', 'desir', 'orgasme', 'therapie', 'osteopath', 'drainage', 'cranio', 'sport', 'digestif', 'consultation', 'auriculo'])) {
             return 'service_page';
         }
 
         return 'unknown';
     }
 
-    public function conversionRecommendationForPage(GscPage $page): string
+    public function isPriorityServicePage(?Website $website, string $url): bool
     {
-        return match ($this->pageType($page->page_url)) {
+        if (! $website) {
+            return false;
+        }
+
+        foreach ($website->serviceProfile()['priority_pages'] as $priorityPage) {
+            if ($this->sameUrl($url, $priorityPage)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function conversionRecommendationForPage(GscPage $page, ?Website $website = null): string
+    {
+        return match ($this->pageType($page->page_url, $website)) {
             'homepage' => 'Check hero CTA and appointment path.',
-            'service_page' => 'Improve appointment CTA.',
+            'service_page' => 'Improve the service-specific appointment CTA and add internal links from high-traffic branded pages.',
             'blog' => 'Add contextual link to the relevant service page.',
             'legal' => 'No conversion action needed.',
             default => $page->clicks > 0 ? 'Clarify the next appointment action.' : 'Review title/meta or noindex if low value.',
         };
+    }
+
+    private function queryRecommendation(Website $website, GscQuery $query, ?GscPage $relatedPage, string $fallback): string
+    {
+        $location = collect($website->serviceProfile()['target_locations'])->first() ?: $website->target_location ?: 'the target location';
+
+        if ($relatedPage) {
+            return $fallback.' Use '.$location.' relevance only where it matches the website settings.';
+        }
+
+        return 'Create or strengthen a service page for "'.$query->query.'" and connect it to the appointment path for '.$location.'.';
+    }
+
+    private function missingPriorityPages(Website $website, Collection $pages): array
+    {
+        return collect($website->serviceProfile()['priority_pages'])
+            ->reject(fn (string $priorityPage) => $pages->contains(fn (GscPage $page) => $this->sameUrl($page->page_url, $priorityPage)))
+            ->values()
+            ->all();
     }
 
     private function score(object $metric, string $sourceType, string $intent, ?string $pageUrl, bool $mobileStrong = false): int
@@ -274,10 +410,12 @@ class GrowthOpportunityGenerator
         };
 
         $score += match ($intent) {
-            'patient_intent', 'local_service' => 20,
+            'local_service_intent' => 28,
+            'service_intent', 'condition_intent' => 24,
             'informational' => 8,
-            'branded' => -10,
-            'competitor', 'irrelevant' => -30,
+            'review_reputation' => 2,
+            'branded_practitioner' => -12,
+            'competitor', 'irrelevant', 'unknown' => -35,
             default => 0,
         };
 
@@ -309,11 +447,12 @@ class GrowthOpportunityGenerator
         $payload = array_merge($data, [
             'source_value' => $sourceValue,
             'source_hash' => $attributes['source_hash'],
-            'clicks' => $metric->clicks,
-            'impressions' => $metric->impressions,
-            'ctr' => $metric->ctr,
-            'position' => $metric->position,
+            'clicks' => $metric->clicks ?? 0,
+            'impressions' => $metric->impressions ?? 0,
+            'ctr' => $metric->ctr ?? 0,
+            'position' => $metric->position ?? 0,
             'status' => 'open',
+            'opportunity_category' => $data['opportunity_category'] ?? $this->opportunityCategoryForIntent($data['intent'] ?? 'unknown'),
         ]);
 
         if ($opportunity) {
@@ -324,5 +463,49 @@ class GrowthOpportunityGenerator
         GrowthOpportunity::create(array_merge($attributes, $payload));
 
         return 1;
+    }
+
+    private function virtualMetric(CarbonInterface $start, CarbonInterface $end): object
+    {
+        return (object) [
+            'date_start' => $start->toDateString(),
+            'date_end' => $end->toDateString(),
+            'clicks' => 0,
+            'impressions' => 0,
+            'ctr' => 0,
+            'position' => 0,
+        ];
+    }
+
+    private function serviceTerms(): array
+    {
+        return ['osteopathe', 'osteopathie', 'drainage lymphatique', 'cranio', 'crani', 'sexologue', 'sexologie', 'consultation', 'therapie', 'traitement', 'traitements', 'sport', 'sante sexuelle'];
+    }
+
+    private function conditionTerms(): array
+    {
+        return ['trouble', 'troubles', 'douleur', 'douleurs', 'symptome', 'baisse desir', 'desir sexuel', 'ejaculation precoce', 'orgasme', 'digestif', 'stress', 'libido'];
+    }
+
+    private function normalizedList(array $values): array
+    {
+        return collect($values)->map(fn ($value) => $this->normalize((string) $value))->filter()->values()->all();
+    }
+
+    private function containsAny(string $haystack, array $needles): bool
+    {
+        $needles = array_values(array_filter($needles, fn ($needle) => filled($needle) && strlen((string) $needle) > 1));
+
+        return $needles !== [] && Str::contains($haystack, $needles);
+    }
+
+    private function normalize(string $value): string
+    {
+        return Str::of($value)->lower()->ascii()->replace(['_', '+'], ' ')->squish()->toString();
+    }
+
+    private function sameUrl(string $first, string $second): bool
+    {
+        return rtrim($this->normalize($first), '/') === rtrim($this->normalize($second), '/');
     }
 }

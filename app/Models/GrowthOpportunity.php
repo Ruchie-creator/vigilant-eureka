@@ -22,6 +22,7 @@ class GrowthOpportunity extends Model
         'ctr',
         'position',
         'opportunity_type',
+        'opportunity_category',
         'problem',
         'recommendation',
         'expected_result',

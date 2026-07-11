@@ -35,11 +35,12 @@
         <div class="border-b border-slate-100 px-5 py-4"><h2 class="font-semibold text-navy">Websites Needing Attention</h2></div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
-                <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">Website</th><th class="px-5 py-3">Clicks</th><th class="px-5 py-3">Impressions</th><th class="px-5 py-3">CTR</th><th class="px-5 py-3">Position</th><th class="px-5 py-3">Top Opportunity</th><th class="px-5 py-3">Tasks</th><th class="px-5 py-3">Last Sync</th></tr></thead>
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">Website</th><th class="px-5 py-3">Data Context</th><th class="px-5 py-3">Clicks</th><th class="px-5 py-3">Impressions</th><th class="px-5 py-3">CTR</th><th class="px-5 py-3">Position</th><th class="px-5 py-3">Top Opportunity</th><th class="px-5 py-3">Tasks</th><th class="px-5 py-3">Last Sync</th></tr></thead>
                 <tbody class="divide-y divide-slate-100">
                 @forelse($websiteRows as $row)
                     <tr>
                         <td class="px-5 py-4 font-semibold"><a href="{{ route('websites.show', $row['website']) }}" class="text-teal">{{ $row['website']->name }}</a></td>
+                        <td class="px-5 py-4 text-slate-500">@if($row['sync_context']){{ $row['sync_context']->date_start->format('M j') }} - {{ $row['sync_context']->date_end->format('M j, Y') }} · {{ $row['sync_context']->property_url }}@else No synced period @endif</td>
                         <td class="px-5 py-4">{{ number_format($row['clicks']) }}</td>
                         <td class="px-5 py-4">{{ number_format($row['impressions']) }}</td>
                         <td class="px-5 py-4">{{ number_format($row['ctr'], 2) }}%</td>
@@ -49,7 +50,7 @@
                         <td class="px-5 py-4 text-slate-500">{{ $row['website']->gsc_last_synced_at?->diffForHumans() ?? 'Never' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">No websites yet.</td></tr>
+                    <tr><td colspan="9" class="px-5 py-10 text-center text-slate-500">No websites yet.</td></tr>
                 @endforelse
                 </tbody>
             </table>

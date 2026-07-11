@@ -1,7 +1,7 @@
 <section class="rounded-lg border border-slate-200 bg-white shadow-soft">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <h2 class="font-semibold text-navy">Top Growth Opportunities</h2>
-        <a href="{{ route('ai-insights.index') }}" class="text-sm font-semibold text-teal">View all</a>
+        <h2 class="font-semibold text-navy">{{ $title ?? 'Top Growth Opportunities' }}</h2>
+        @isset($website)<a href="{{ route('websites.growth-opportunities.index', $website) }}" class="text-sm font-semibold text-teal">View all</a>@endisset
     </div>
     <div class="divide-y divide-slate-100">
         @forelse($opportunities as $opportunity)
@@ -10,6 +10,7 @@
                     <div>
                         <p class="font-semibold">{{ str_replace('_', ' ', ucfirst($opportunity->opportunity_type)) }}</p>
                         <p class="mt-1 break-all text-sm text-slate-500">{{ ucfirst($opportunity->source_type) }}: {{ $opportunity->source_value }}</p>
+                        <p class="mt-1 text-xs font-semibold uppercase text-slate-400">{{ str_replace('_', ' ', $opportunity->opportunity_category ?? 'conversion_improvement') }} · {{ str_replace('_', ' ', $opportunity->intent ?? 'unknown') }}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <span class="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">Score {{ $opportunity->score }}</span>
@@ -17,6 +18,7 @@
                     </div>
                 </div>
                 @if($opportunity->related_page_url)<p class="mt-2 break-all text-sm text-slate-500">Related page: {{ $opportunity->related_page_url }}</p>@endif
+                <p class="mt-2 text-sm text-slate-500">Metrics: {{ number_format($opportunity->impressions) }} impressions · {{ number_format($opportunity->clicks) }} clicks · {{ number_format($opportunity->ctr, 2) }}% CTR · position {{ number_format($opportunity->position, 1) }}</p>
                 <p class="mt-3 text-sm text-slate-700">{{ $opportunity->problem }}</p>
                 <p class="mt-2 text-sm font-medium text-navy">{{ $opportunity->recommendation }}</p>
                 <p class="mt-2 text-sm text-slate-600">Expected result: {{ $opportunity->expected_result }}</p>

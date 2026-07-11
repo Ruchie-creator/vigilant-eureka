@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\GoogleAccount;
 use App\Models\GscDailyMetric;
+use App\Models\GscCountry;
 use App\Models\GscDevice;
 use App\Models\GscPage;
 use App\Models\GscQuery;
+use App\Models\GscSync;
 use App\Models\SearchConsoleSite;
 use App\Models\User;
 use App\Models\Website;
@@ -127,74 +129,144 @@ class GoogleSearchConsoleService
         return $count;
     }
 
-    public function syncWebsite(Website $website, ?CarbonInterface $start = null, ?CarbonInterface $end = null): array
+    public function syncWebsite(Website $website, ?CarbonInterface $start = null, ?CarbonInterface $end = null, string $searchType = 'web', ?string $countryFilter = null, ?string $deviceFilter = null): array
     {
         $site = $website->searchConsoleSite?->load('googleAccount');
         if (! $site) {
             throw new RuntimeException('Select a Google Search Console property for this website first.');
         }
 
-        $account = $this->refreshIfNeeded($site->googleAccount);
         $start ??= now()->subDays(28);
         $end ??= now()->subDay();
+        $syncedAt = now();
+        $sync = GscSync::create([
+            'website_id' => $website->id,
+            'search_console_site_id' => $site->id,
+            'property_url' => $site->site_url,
+            'date_start' => $start->toDateString(),
+            'date_end' => $end->toDateString(),
+            'search_type' => $searchType,
+            'country_filter' => $countryFilter,
+            'device_filter' => $deviceFilter,
+            'synced_at' => $syncedAt,
+            'status' => 'running',
+        ]);
 
-        $daily = $this->queryAnalytics($account, $site->site_url, $start, $end, ['date'], 200);
-        $queries = $this->queryAnalytics($account, $site->site_url, $start, $end, ['query'], 100);
-        $pages = $this->queryAnalytics($account, $site->site_url, $start, $end, ['page'], 100);
-        $devices = $this->queryAnalytics($account, $site->site_url, $start, $end, ['device'], 20);
+        try {
+            if (! SearchConsolePropertyMatcher::matches($website->url, $site->site_url)) {
+                throw new RuntimeException('This Search Console property does not match the website URL.');
+            }
 
-        foreach ($daily as $row) {
-            GscDailyMetric::updateOrCreate(
-                ['website_id' => $website->id, 'date' => $row['keys'][0]],
-                $this->metricsPayload($website, $site, $row)
-            );
+            $account = $this->refreshIfNeeded($site->googleAccount);
+
+            $daily = $this->queryAnalytics($account, $site->site_url, $start, $end, ['date'], 200, $searchType, $countryFilter, $deviceFilter);
+            $queries = $this->queryAnalytics($account, $site->site_url, $start, $end, ['query'], 100, $searchType, $countryFilter, $deviceFilter);
+            $pages = $this->queryAnalytics($account, $site->site_url, $start, $end, ['page'], 100, $searchType, $countryFilter, $deviceFilter);
+            $devices = $this->queryAnalytics($account, $site->site_url, $start, $end, ['device'], 20, $searchType, $countryFilter, $deviceFilter);
+            $countries = $this->queryAnalytics($account, $site->site_url, $start, $end, ['country'], 250, $searchType, $countryFilter, $deviceFilter);
+
+            foreach ($daily as $row) {
+                GscDailyMetric::updateOrCreate(
+                    ['website_id' => $website->id, 'date' => $row['keys'][0]],
+                    $this->metricsPayload($website, $site, $row)
+                );
+            }
+
+            foreach ($queries as $row) {
+                $queryText = Str::limit($row['keys'][0], 512, '');
+                GscQuery::updateOrCreate(
+                    ['website_id' => $website->id, 'query' => $queryText, 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
+                    $this->metricsPayload($website, $site, $row)
+                );
+            }
+
+            foreach ($pages as $row) {
+                $pageUrl = Str::limit($row['keys'][0], 512, '');
+                GscPage::updateOrCreate(
+                    ['website_id' => $website->id, 'page_url' => $pageUrl, 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
+                    $this->metricsPayload($website, $site, $row)
+                );
+            }
+
+            foreach ($devices as $row) {
+                GscDevice::updateOrCreate(
+                    ['website_id' => $website->id, 'device' => Str::lower($row['keys'][0]), 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
+                    $this->metricsPayload($website, $site, $row)
+                );
+            }
+
+            foreach ($countries as $row) {
+                GscCountry::updateOrCreate(
+                    ['website_id' => $website->id, 'country' => Str::upper($row['keys'][0]), 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
+                    $this->metricsPayload($website, $site, $row)
+                );
+            }
+
+            $summary = $this->syncSummary($daily);
+
+            $sync->update([
+                'total_clicks' => $summary['clicks'],
+                'total_impressions' => $summary['impressions'],
+                'average_ctr' => $summary['ctr'],
+                'average_position' => $summary['position'],
+                'rows_daily' => count($daily),
+                'rows_queries' => count($queries),
+                'rows_pages' => count($pages),
+                'rows_devices' => count($devices),
+                'rows_countries' => count($countries),
+                'status' => 'success',
+                'error_message' => null,
+            ]);
+
+            $website->update(['gsc_last_synced_at' => $syncedAt]);
+        } catch (Throwable $exception) {
+            $sync->update([
+                'status' => 'failed',
+                'error_message' => Str::limit($exception->getMessage(), 2000, ''),
+            ]);
+
+            throw $exception;
         }
-
-        foreach ($queries as $row) {
-            $queryText = Str::limit($row['keys'][0], 512, '');
-            GscQuery::updateOrCreate(
-                ['website_id' => $website->id, 'query' => $queryText, 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
-                $this->metricsPayload($website, $site, $row)
-            );
-        }
-
-        foreach ($pages as $row) {
-            $pageUrl = Str::limit($row['keys'][0], 512, '');
-            GscPage::updateOrCreate(
-                ['website_id' => $website->id, 'page_url' => $pageUrl, 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
-                $this->metricsPayload($website, $site, $row)
-            );
-        }
-
-        foreach ($devices as $row) {
-            GscDevice::updateOrCreate(
-                ['website_id' => $website->id, 'device' => Str::lower($row['keys'][0]), 'date_start' => $start->toDateString(), 'date_end' => $end->toDateString()],
-                $this->metricsPayload($website, $site, $row)
-            );
-        }
-
-        $website->update(['gsc_last_synced_at' => now()]);
 
         return [
-            'daily' => count($daily),
-            'queries' => count($queries),
-            'pages' => count($pages),
-            'devices' => count($devices),
+            'daily' => (int) $sync->rows_daily,
+            'queries' => (int) $sync->rows_queries,
+            'pages' => (int) $sync->rows_pages,
+            'devices' => (int) $sync->rows_devices,
+            'countries' => (int) $sync->rows_countries,
             'start' => $start,
             'end' => $end,
+            'property_url' => $site->site_url,
+            'search_type' => $searchType,
+            'country_filter' => $countryFilter,
+            'device_filter' => $deviceFilter,
         ];
     }
 
-    public function queryAnalytics(GoogleAccount $account, string $siteUrl, CarbonInterface $start, CarbonInterface $end, array $dimensions, int $limit = 100): array
+    public function queryAnalytics(GoogleAccount $account, string $siteUrl, CarbonInterface $start, CarbonInterface $end, array $dimensions, int $limit = 100, string $searchType = 'web', ?string $countryFilter = null, ?string $deviceFilter = null): array
     {
+        $payload = [
+            'startDate' => $start->toDateString(),
+            'endDate' => $end->toDateString(),
+            'dimensions' => $dimensions,
+            'rowLimit' => $limit,
+            'searchType' => $searchType,
+        ];
+
+        $filters = [];
+        if (filled($countryFilter)) {
+            $filters[] = ['dimension' => 'country', 'operator' => 'equals', 'expression' => strtolower($countryFilter)];
+        }
+        if (filled($deviceFilter)) {
+            $filters[] = ['dimension' => 'device', 'operator' => 'equals', 'expression' => strtoupper($deviceFilter)];
+        }
+        if ($filters) {
+            $payload['dimensionFilterGroups'] = [['filters' => $filters]];
+        }
+
         $response = Http::withToken($account->access_token)
             ->timeout(30)
-            ->post('https://www.googleapis.com/webmasters/v3/sites/'.rawurlencode($siteUrl).'/searchAnalytics/query', [
-                'startDate' => $start->toDateString(),
-                'endDate' => $end->toDateString(),
-                'dimensions' => $dimensions,
-                'rowLimit' => $limit,
-            ]);
+            ->post('https://www.googleapis.com/webmasters/v3/sites/'.rawurlencode($siteUrl).'/searchAnalytics/query', $payload);
 
         if (! $response->successful()) {
             Log::warning('Google Search Console analytics query failed.', ['site_url' => $siteUrl, 'dimensions' => $dimensions, 'status' => $response->status()]);
@@ -216,6 +288,25 @@ class GoogleSearchConsoleService
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function syncSummary(array $daily): array
+    {
+        $clicks = array_sum(array_map(fn ($row) => (int) ($row['clicks'] ?? 0), $daily));
+        $impressions = array_sum(array_map(fn ($row) => (int) ($row['impressions'] ?? 0), $daily));
+
+        if ($impressions <= 0) {
+            return ['clicks' => $clicks, 'impressions' => 0, 'ctr' => 0, 'position' => 0];
+        }
+
+        $weightedPosition = array_sum(array_map(fn ($row) => ((float) ($row['position'] ?? 0)) * (int) ($row['impressions'] ?? 0), $daily));
+
+        return [
+            'clicks' => $clicks,
+            'impressions' => $impressions,
+            'ctr' => round(($clicks / $impressions) * 100, 4),
+            'position' => round($weightedPosition / $impressions, 2),
+        ];
     }
 
     private function metricsPayload(Website $website, SearchConsoleSite $site, array $row): array

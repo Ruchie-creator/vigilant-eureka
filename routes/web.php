@@ -25,9 +25,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::resource('websites', WebsiteController::class);
+    Route::get('/websites/{website}/gsc-queries', [WebsiteController::class, 'gscQueries'])->name('websites.gsc-queries.index');
+    Route::get('/websites/{website}/gsc-pages', [WebsiteController::class, 'gscPages'])->name('websites.gsc-pages.index');
+    Route::get('/websites/{website}/growth-opportunities', [WebsiteController::class, 'growthOpportunities'])->name('websites.growth-opportunities.index');
     Route::post('/websites/{website}/audit', [SeoAuditController::class, 'store'])->name('websites.audit');
     Route::post('/websites/{website}/search-console/site', [WebsiteSearchConsoleController::class, 'assign'])->name('websites.search-console.assign');
     Route::post('/websites/{website}/search-console/sync', [WebsiteSearchConsoleController::class, 'sync'])->name('websites.search-console.sync');
+    Route::post('/websites/{website}/search-console/reset', [WebsiteSearchConsoleController::class, 'reset'])->name('websites.search-console.reset');
     Route::post('/websites/{website}/search-console/disconnect', [WebsiteSearchConsoleController::class, 'disconnect'])->name('websites.search-console.disconnect');
 
     Route::get('/google/search-console/connect', [GoogleSearchConsoleController::class, 'connect'])->name('google.search-console.connect');
