@@ -12,10 +12,47 @@ use Illuminate\View\View;
 
 class MarketingTaskController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = [
+            'website_id' => $request->query('website_id'),
+            'priority' => $request->query('priority'),
+            'category' => $request->query('category'),
+            'status' => $request->query('status'),
+            'source' => $request->query('source'),
+            'origin' => $request->query('origin'),
+        ];
+
+        $query = MarketingTask::with(['website', 'aiInsight', 'growthOpportunity'])
+            ->when(filled($filters['website_id']), fn ($query) => $query->where('website_id', $filters['website_id']))
+            ->when(filled($filters['priority']), fn ($query) => $query->where('priority', $filters['priority']))
+            ->when(filled($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(filled($filters['source']), function ($query) use ($filters) {
+                $term = '%'.$filters['source'].'%';
+
+                $query->where(function ($query) use ($term) {
+                    $query->where('source_value', 'like', $term)
+                        ->orWhere('related_page_url', 'like', $term);
+                });
+            })
+            ->when(filled($filters['category']), function ($query) use ($filters) {
+                $query->where(function ($query) use ($filters) {
+                    $query->whereHas('growthOpportunity', fn ($query) => $query->where('opportunity_category', $filters['category']))
+                        ->orWhereHas('aiInsight', fn ($query) => $query->where('category', $filters['category']));
+                });
+            })
+            ->when($filters['origin'] === 'opportunity', fn ($query) => $query->whereNotNull('growth_opportunity_id'))
+            ->when($filters['origin'] === 'ai_insight', fn ($query) => $query->whereNotNull('ai_insight_id')->whereNull('growth_opportunity_id'))
+            ->when($filters['origin'] === 'manual', fn ($query) => $query->whereNull('growth_opportunity_id')->whereNull('ai_insight_id'))
+            ->latest();
+
+        $tasks = $query->get();
+
         return view('marketing-tasks.index', [
-            'tasks' => MarketingTask::with(['website', 'aiInsight'])->latest()->paginate(15),
+            'tasks' => $tasks,
+            'tasksByStatus' => $tasks->groupBy('status'),
+            'filters' => $filters,
+            'websites' => Website::orderBy('name')->get(),
         ]);
     }
 
@@ -49,6 +86,17 @@ class MarketingTaskController extends Controller
         return redirect()->route('marketing-tasks.index')->with('success', 'Task updated.');
     }
 
+    public function updateStatus(Request $request, MarketingTask $marketingTask): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['pending', 'in_progress', 'completed', 'ignored'])],
+        ]);
+
+        $marketingTask->update($data);
+
+        return back()->with('success', 'Task status updated.');
+    }
+
     public function destroy(MarketingTask $marketingTask): RedirectResponse
     {
         $marketingTask->delete();
@@ -63,7 +111,10 @@ class MarketingTaskController extends Controller
             'ai_insight_id' => $aiInsight->id,
             'title' => $aiInsight->title,
             'description' => $aiInsight->recommendation,
+            'expected_result' => $aiInsight->expected_result,
             'priority' => $aiInsight->priority,
+            'source_type' => 'ai_insight',
+            'source_value' => $aiInsight->title,
             'status' => 'pending',
         ]);
 

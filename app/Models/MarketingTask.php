@@ -38,4 +38,9 @@ class MarketingTask extends Model
     {
         return $this->belongsTo(AiInsight::class);
     }
+
+    public function growthOpportunity(): BelongsTo
+    {
+        return $this->belongsTo(GrowthOpportunity::class);
+    }
 }

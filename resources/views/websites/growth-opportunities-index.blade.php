@@ -1,10 +1,19 @@
 <x-layouts.app :heading="$website->name.' - Growth Opportunities'">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('websites.show', $website) }}" class="text-sm font-semibold text-teal">Back to website</a>
-        <p class="text-sm text-slate-500">{{ $opportunities->total() }} open opportunities</p>
+        <p class="text-sm text-slate-500">{{ $opportunities->total() }} opportunities</p>
     </div>
 
-    @include('websites.partials.growth-opportunities', ['opportunities' => $opportunities->getCollection(), 'title' => 'All Growth Opportunities'])
+    <form method="GET" class="mb-5 grid gap-3 rounded-lg bg-white p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)] md:grid-cols-5">
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Priority<select name="priority" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">Any priority</option>@foreach(['high','medium','low'] as $priority)<option value="{{ $priority }}" @selected($filters['priority'] === $priority)>{{ ucfirst($priority) }}</option>@endforeach</select></label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Status<select name="status" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">Any status</option>@foreach(['open','reviewed','in_progress','completed','ignored'] as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ str_replace('_', ' ', ucfirst($status)) }}</option>@endforeach</select></label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Category<select name="category" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">Any category</option>@foreach(['acquisition_growth','service_page_growth','conversion_improvement','reputation_conversion','branded_visibility','technical_seo','low_value'] as $category)<option value="{{ $category }}" @selected($filters['category'] === $category)>{{ str_replace('_', ' ', ucfirst($category)) }}</option>@endforeach</select></label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Source type<select name="source_type" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">Any source</option>@foreach(['page','query','device','country'] as $sourceType)<option value="{{ $sourceType }}" @selected($filters['source_type'] === $sourceType)>{{ ucfirst($sourceType) }}</option>@endforeach</select></label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Page or query<input name="source" value="{{ $filters['source'] }}" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy" placeholder="Search source"></label>
+        <div class="flex items-end gap-2 md:col-span-5"><button class="min-h-10 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white transition-transform active:scale-[0.96]">Apply filters</button><a href="{{ route('websites.growth-opportunities.index', $website) }}" class="inline-flex min-h-10 items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.12)]">Reset</a></div>
+    </form>
+
+    @include('websites.partials.growth-opportunities', ['opportunities' => $opportunities->getCollection(), 'title' => 'All Growth Opportunities', 'isFullView' => true])
 
     <div class="mt-5">{{ $opportunities->links() }}</div>
 </x-layouts.app>

@@ -508,14 +508,36 @@ class WebsiteController extends Controller
         return view('websites.gsc-devices-index', compact('website', 'devices', 'deviceMetrics'));
     }
 
-    public function growthOpportunities(Website $website): View
+    public function growthOpportunities(Request $request, Website $website): View
     {
+        $filters = [
+            'priority' => $request->query('priority'),
+            'status' => $request->query('status', 'open'),
+            'category' => $request->query('category'),
+            'source_type' => $request->query('source_type'),
+            'source' => $request->query('source'),
+        ];
+
         return view('websites.growth-opportunities-index', [
             'website' => $website,
             'opportunities' => $website->growthOpportunities()
-                ->where('status', 'open')
+                ->when(filled($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+                ->when(filled($filters['priority']), fn ($query) => $query->where('priority', $filters['priority']))
+                ->when(filled($filters['category']), fn ($query) => $query->where('opportunity_category', $filters['category']))
+                ->when(filled($filters['source_type']), fn ($query) => $query->where('source_type', $filters['source_type']))
+                ->when(filled($filters['source']), function ($query) use ($filters) {
+                    $term = '%'.$filters['source'].'%';
+
+                    $query->where(function ($query) use ($term) {
+                        $query->where('source_value', 'like', $term)
+                            ->orWhere('related_page_url', 'like', $term);
+                    });
+                })
+                ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
                 ->orderByDesc('score')
-                ->paginate(25),
+                ->paginate(25)
+                ->withQueryString(),
+            'filters' => $filters,
         ]);
     }
 

@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/growth-opportunities/{growthOpportunity}/tasks', [GrowthOpportunityController::class, 'storeTask'])->name('growth-opportunities.tasks.store');
     Route::patch('/growth-opportunities/{growthOpportunity}', [GrowthOpportunityController::class, 'update'])->name('growth-opportunities.update');
 
+    Route::patch('/marketing-tasks/{marketingTask}/status', [MarketingTaskController::class, 'updateStatus'])->name('marketing-tasks.status.update');
     Route::resource('marketing-tasks', MarketingTaskController::class)->except(['show']);
 
     Route::get('/weekly-reports', [WeeklyReportController::class, 'index'])->name('weekly-reports.index');
