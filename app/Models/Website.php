@@ -157,7 +157,13 @@ class Website extends Model
                 'target_locations' => ['Lyon', 'Lyon 2', 'France'],
                 'practitioner_names' => ['Thomas Baptiste Weiss', 'Thomas Weiss', 'Baptiste Weiss'],
                 'brand_terms' => ['tbweiss', 'tbweiss osteo', 'thomas weiss osteopathe'],
-                'priority_pages' => [],
+                'priority_pages' => [
+                    'https://tbweiss-osteo-lyon.com/therapie-cranio-sacrale/',
+                    'https://tbweiss-osteo-lyon.com/drainage-lymphatique/',
+                    'https://tbweiss-osteo-lyon.com/osteopathie-cranio-sacree/',
+                    'https://tbweiss-osteo-lyon.com/osteopathie-du-sport/',
+                    'https://tbweiss-osteo-lyon.com/osteopathie-lyon-2/',
+                ],
             ];
         }
 

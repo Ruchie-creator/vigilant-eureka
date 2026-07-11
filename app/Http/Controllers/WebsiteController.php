@@ -55,6 +55,7 @@ class WebsiteController extends Controller
             'device' => $request->query('device'),
             'query_intent' => $request->query('query_intent'),
             'page_type' => $request->query('page_type'),
+            'country_scope' => $request->query('country_scope'),
             'opportunity_category' => $request->query('opportunity_category'),
             'opportunity_priority' => $request->query('opportunity_priority'),
             'status' => $request->query('status'),
@@ -123,7 +124,7 @@ class WebsiteController extends Controller
             ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
             ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
             ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
-            ->limit(8)
+            ->limit(5)
             ->get() : collect();
 
         $brandedOpportunities = $hasGrowth ? $website->growthOpportunities()
@@ -132,7 +133,7 @@ class WebsiteController extends Controller
             ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
             ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
             ->orderByDesc('impressions')
-            ->limit(6)
+            ->limit(5)
             ->get() : collect();
 
         $queries = $hasGscTables ? $website->gscQueries()
@@ -211,23 +212,21 @@ class WebsiteController extends Controller
 
         $deviceRows = $hasGscTables ? $website->gscDevices()
             ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
-            ->selectRaw('device, SUM(clicks) as clicks')
+            ->selectRaw('device, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(ctr) as ctr, AVG(position) as position')
             ->groupBy('device')
             ->orderByDesc('clicks')
             ->get() : collect();
 
         $countryRows = $hasGscCountries ? $website->gscCountries()
             ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
-            ->selectRaw('country, SUM(clicks) as clicks')
+            ->selectRaw('country, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(ctr) as ctr, AVG(position) as position')
             ->groupBy('country')
             ->orderByDesc('clicks')
-            ->limit(8)
             ->get() : collect();
 
         $profile = $website->serviceProfile();
-        $targetCountry = collect($profile['target_locations'] ?? [])
-            ->first(fn ($location) => in_array(strtolower((string) $location), ['france', 'suisse', 'switzerland'], true))
-            ?: 'Not set';
+        $targetCountry = $this->targetCountryLabel($website);
+        $targetCountryCodes = $this->targetCountryCodes($targetCountry);
 
         $chartData = [
             'trend' => [
@@ -246,6 +245,61 @@ class WebsiteController extends Controller
                 'clicks' => $countryRows->pluck('clicks')->map(fn ($clicks) => (int) $clicks)->values(),
             ],
         ];
+
+        $countryMetrics = $countryRows
+            ->filter(fn ($row) => blank($filters['country']) || strtoupper((string) $row->country) === strtoupper((string) $filters['country']))
+            ->filter(function ($row) use ($filters, $targetCountryCodes) {
+                if ($filters['country_scope'] === 'target') {
+                    return $this->isTargetCountry((string) $row->country, $targetCountryCodes);
+                }
+
+                if ($filters['country_scope'] === 'non_target') {
+                    return ! $this->isTargetCountry((string) $row->country, $targetCountryCodes);
+                }
+
+                return true;
+            })
+            ->take(5)
+            ->map(fn ($row) => [
+                'country' => $row->country,
+                'clicks' => (int) $row->clicks,
+                'impressions' => (int) $row->impressions,
+                'ctr' => (float) $row->ctr,
+                'position' => (float) $row->position,
+                'is_target' => $this->isTargetCountry((string) $row->country, $targetCountryCodes),
+                'recommendation' => $this->countryRecommendation((string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
+            ]);
+
+        $deviceMetrics = $deviceRows->take(5)->map(fn ($row) => [
+            'device' => $row->device,
+            'clicks' => (int) $row->clicks,
+            'impressions' => (int) $row->impressions,
+            'ctr' => (float) $row->ctr,
+            'position' => (float) $row->position,
+            'recommendation' => $this->deviceRecommendation((string) $row->device, (float) $row->ctr, (float) $row->position),
+        ]);
+
+        $pageRecommendations = $pageRows->map(fn ($page) => [
+            'page' => $page,
+            'page_type' => $classifier->pageType($page->page_url, $website),
+            'is_priority_service_page' => $classifier->isPriorityServicePage($website, $page->page_url),
+            'top_country' => $topCountry?->country,
+            'top_device' => $topDevice?->device,
+            'recommendation' => $classifier->conversionRecommendationForPage($page, $website),
+        ]);
+
+        $queryRows = $queries->map(function ($query) use ($website, $classifier, $dateScopedPages) {
+            $intent = $classifier->classifyQueryIntent($query->query, $website);
+            $relatedPage = $classifier->mapQueryToPage($query->query, $dateScopedPages, $website);
+
+            return [
+                'query' => $query,
+                'intent' => $intent,
+                'category' => $classifier->opportunityCategoryForIntent($intent),
+                'related_page' => $relatedPage?->page_url,
+                'recommendation' => $this->queryRecommendationForDisplay($intent, $relatedPage?->page_url),
+            ];
+        });
 
         return view('websites.show', [
             'website' => $website,
@@ -266,16 +320,14 @@ class WebsiteController extends Controller
             'servicePageClicks' => (int) $servicePageClicks,
             'brandedClicks' => (int) $brandedClicks,
             'targetCountry' => $targetCountry,
+            'countryMetrics' => $countryMetrics,
+            'deviceMetrics' => $deviceMetrics,
             'chartData' => $chartData,
             'openConversionOpportunities' => $hasGrowth ? $website->growthOpportunities()->where('status', 'open')->whereIn('opportunity_type', ['improve_booking_cta', 'mobile_conversion', 'increase_ctr_and_conversion'])->count() : 0,
             'topPriority' => $topPriority,
-            'pageRecommendations' => $pageRows->map(fn ($page) => [
-                'page' => $page,
-                'page_type' => $classifier->pageType($page->page_url, $website),
-                'is_priority_service_page' => $classifier->isPriorityServicePage($website, $page->page_url),
-                'recommendation' => $classifier->conversionRecommendationForPage($page, $website),
-            ]),
+            'pageRecommendations' => $pageRecommendations,
             'filteredQueries' => $queries,
+            'queryRows' => $queryRows,
             'queryIntents' => $queryIntents,
             'serviceOpportunities' => $serviceOpportunities,
             'brandedOpportunities' => $brandedOpportunities,
@@ -292,6 +344,78 @@ class WebsiteController extends Controller
             ->when(filled($filters['device']), fn ($query) => $query->where('device_filter', $filters['device']))
             ->latest('synced_at')
             ->first();
+    }
+
+    private function targetCountryLabel(Website $website): string
+    {
+        $locations = collect($website->serviceProfile()['target_locations'] ?? [])->map(fn ($location) => strtolower((string) $location));
+
+        if ($locations->contains(fn ($location) => str_contains($location, 'suisse') || str_contains($location, 'switzerland') || str_contains($location, 'geneve') || str_contains($location, 'geneva'))) {
+            return 'Switzerland';
+        }
+
+        if ($locations->contains(fn ($location) => str_contains($location, 'france') || str_contains($location, 'lyon'))) {
+            return 'France';
+        }
+
+        return 'Not set';
+    }
+
+    private function targetCountryCodes(string $targetCountry): array
+    {
+        return match ($targetCountry) {
+            'France' => ['france', 'fra', 'fr'],
+            'Switzerland' => ['switzerland', 'suisse', 'che', 'ch'],
+            default => [],
+        };
+    }
+
+    private function isTargetCountry(string $country, array $targetCountryCodes): bool
+    {
+        $country = strtolower($country);
+
+        return in_array($country, $targetCountryCodes, true);
+    }
+
+    private function countryRecommendation(string $country, bool $isTarget, int $clicks): string
+    {
+        if ($isTarget) {
+            return $clicks > 0
+                ? 'Protect target-country visibility and connect service pages to appointment CTAs.'
+                : 'Improve target-country relevance on service pages and local trust signals.';
+        }
+
+        return 'Review whether this country is useful; avoid letting non-target traffic distract from appointment growth.';
+    }
+
+    private function deviceRecommendation(string $device, float $ctr, float $position): string
+    {
+        $device = strtolower($device);
+
+        if ($device === 'mobile') {
+            return 'Prioritize fast mobile booking CTAs, tap-to-call, and short service-page intros.';
+        }
+
+        if ($ctr < 2 && $position <= 12) {
+            return 'Improve titles/meta and ensure the appointment path is visible above the fold.';
+        }
+
+        return 'Keep the conversion path clear and verify booking interactions are tracked.';
+    }
+
+    private function queryRecommendationForDisplay(string $intent, ?string $relatedPage): string
+    {
+        if (in_array($intent, ['branded_practitioner', 'review_reputation'], true)) {
+            return 'Strengthen trust, credentials, review visibility, and the appointment CTA on the About/practitioner path.';
+        }
+
+        if (in_array($intent, ['service_intent', 'local_service_intent', 'condition_intent'], true)) {
+            return $relatedPage
+                ? 'Improve the related service page title/meta, patient-intent copy, internal links, and booking CTA.'
+                : 'Map this query to a relevant service page and add a clear appointment path.';
+        }
+
+        return 'Review intent fit before prioritizing; do not let low-value searches dominate growth work.';
     }
 
     public function edit(Website $website): View
@@ -311,29 +435,77 @@ class WebsiteController extends Controller
     public function gscQueries(Website $website, GrowthOpportunityGenerator $classifier): View
     {
         $queries = $website->gscQueries()->orderByDesc('impressions')->paginate(50);
-        $queryIntents = $queries->getCollection()->mapWithKeys(function ($query) use ($website, $classifier) {
+        $pages = $website->gscPages()->get();
+        $queryRows = $queries->getCollection()->map(function ($query) use ($website, $classifier, $pages) {
             $intent = $classifier->classifyQueryIntent($query->query, $website);
+            $relatedPage = $classifier->mapQueryToPage($query->query, $pages, $website);
 
-            return [$query->id => [
+            return [
+                'query' => $query,
                 'intent' => $intent,
                 'category' => $classifier->opportunityCategoryForIntent($intent),
-            ]];
+                'related_page' => $relatedPage?->page_url,
+                'recommendation' => $this->queryRecommendationForDisplay($intent, $relatedPage?->page_url),
+            ];
         });
 
-        return view('websites.gsc-queries-index', compact('website', 'queries', 'queryIntents'));
+        return view('websites.gsc-queries-index', compact('website', 'queries', 'queryRows'));
     }
 
     public function gscPages(Website $website, GrowthOpportunityGenerator $classifier): View
     {
         $pages = $website->gscPages()->orderByDesc('impressions')->paginate(50);
+        $topCountry = $website->gscCountries()->orderByDesc('clicks')->first();
+        $topDevice = $website->gscDevices()->orderByDesc('clicks')->first();
         $pageRecommendations = $pages->getCollection()->map(fn ($page) => [
             'page' => $page,
             'page_type' => $classifier->pageType($page->page_url, $website),
             'is_priority_service_page' => $classifier->isPriorityServicePage($website, $page->page_url),
+            'top_country' => $topCountry?->country,
+            'top_device' => $topDevice?->device,
             'recommendation' => $classifier->conversionRecommendationForPage($page, $website),
         ]);
 
         return view('websites.gsc-pages-index', compact('website', 'pages', 'pageRecommendations'));
+    }
+
+    public function gscCountries(Website $website): View
+    {
+        $targetCountry = $this->targetCountryLabel($website);
+        $targetCountryCodes = $this->targetCountryCodes($targetCountry);
+        $countries = $website->gscCountries()
+            ->orderByDesc('clicks')
+            ->paginate(50);
+
+        $countryMetrics = $countries->getCollection()->map(fn ($row) => [
+            'country' => $row->country,
+            'clicks' => (int) $row->clicks,
+            'impressions' => (int) $row->impressions,
+            'ctr' => (float) $row->ctr,
+            'position' => (float) $row->position,
+            'is_target' => $this->isTargetCountry((string) $row->country, $targetCountryCodes),
+            'recommendation' => $this->countryRecommendation((string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
+        ]);
+
+        return view('websites.gsc-countries-index', compact('website', 'countries', 'countryMetrics', 'targetCountry'));
+    }
+
+    public function gscDevices(Website $website): View
+    {
+        $devices = $website->gscDevices()
+            ->orderByDesc('clicks')
+            ->paginate(50);
+
+        $deviceMetrics = $devices->getCollection()->map(fn ($row) => [
+            'device' => $row->device,
+            'clicks' => (int) $row->clicks,
+            'impressions' => (int) $row->impressions,
+            'ctr' => (float) $row->ctr,
+            'position' => (float) $row->position,
+            'recommendation' => $this->deviceRecommendation((string) $row->device, (float) $row->ctr, (float) $row->position),
+        ]);
+
+        return view('websites.gsc-devices-index', compact('website', 'devices', 'deviceMetrics'));
     }
 
     public function growthOpportunities(Website $website): View

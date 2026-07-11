@@ -4,7 +4,7 @@
         <p class="text-sm text-slate-500">{{ $queries->total() }} queries</p>
     </div>
 
-    @include('websites.partials.gsc-queries', ['queries' => $queries->getCollection(), 'queryIntents' => $queryIntents])
+    @include('websites.partials.gsc-queries', ['queryRows' => $queryRows])
 
     <div class="mt-5">{{ $queries->links() }}</div>
 </x-layouts.app>

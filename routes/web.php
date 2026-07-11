@@ -27,6 +27,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('websites', WebsiteController::class);
     Route::get('/websites/{website}/gsc-queries', [WebsiteController::class, 'gscQueries'])->name('websites.gsc-queries.index');
     Route::get('/websites/{website}/gsc-pages', [WebsiteController::class, 'gscPages'])->name('websites.gsc-pages.index');
+    Route::get('/websites/{website}/gsc-countries', [WebsiteController::class, 'gscCountries'])->name('websites.gsc-countries.index');
+    Route::get('/websites/{website}/gsc-devices', [WebsiteController::class, 'gscDevices'])->name('websites.gsc-devices.index');
     Route::get('/websites/{website}/growth-opportunities', [WebsiteController::class, 'growthOpportunities'])->name('websites.growth-opportunities.index');
     Route::post('/websites/{website}/audit', [SeoAuditController::class, 'store'])->name('websites.audit');
     Route::post('/websites/{website}/search-console/site', [WebsiteSearchConsoleController::class, 'assign'])->name('websites.search-console.assign');

@@ -22,8 +22,8 @@
         <div class="grid gap-6 p-6 lg:grid-cols-[1fr_360px] lg:p-7">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <span class="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold">{{ ucfirst($website->type) }}</span>
-                    <span class="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold">{{ strtoupper($website->language) }}</span>
+                    <span class="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold">{{ ucfirst($website->type ?: 'website') }}</span>
+                    <span class="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold">{{ strtoupper($website->language ?: 'n/a') }}</span>
                     <span class="rounded-lg px-3 py-1 text-xs font-semibold {{ $connectionClass }}">{{ $connectionLabel }}</span>
                 </div>
                 <h1 class="mt-4 text-balance text-3xl font-bold tracking-tight md:text-4xl">{{ $website->name }}</h1>
@@ -92,6 +92,7 @@
         <form method="GET" action="{{ route('websites.show', $website) }}" class="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-8">
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Start<input type="date" name="date_start" value="{{ $filters['date_start'] }}" class="min-h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">End<input type="date" name="date_end" value="{{ $filters['date_end'] }}" class="min-h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"></label>
+            <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Country scope<select name="country_scope" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All countries</option><option value="target" @selected($filters['country_scope'] === 'target')>Target country</option><option value="non_target" @selected($filters['country_scope'] === 'non_target')>Non-target countries</option></select></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Country<select name="country" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All countries</option>@foreach($availableCountries as $country)<option value="{{ $country }}" @selected($filters['country'] === $country)>{{ $country }}</option>@endforeach</select></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Device<select name="device" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All devices</option>@foreach(['desktop','mobile','tablet'] as $device)<option value="{{ $device }}" @selected($filters['device'] === $device)>{{ ucfirst($device) }}</option>@endforeach</select></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Intent<select name="query_intent" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All intents</option>@foreach(['service_intent','local_service_intent','condition_intent','branded_practitioner','review_reputation','informational','competitor','irrelevant','unknown'] as $intent)<option value="{{ $intent }}" @selected($filters['query_intent'] === $intent)>{{ str_replace('_', ' ', ucfirst($intent)) }}</option>@endforeach</select></label>
@@ -99,7 +100,7 @@
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Category<select name="opportunity_category" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All categories</option>@foreach(['acquisition_growth','service_page_growth','conversion_improvement','reputation_conversion','branded_visibility','technical_seo','low_value'] as $category)<option value="{{ $category }}" @selected($filters['opportunity_category'] === $category)>{{ str_replace('_', ' ', ucfirst($category)) }}</option>@endforeach</select></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Priority<select name="opportunity_priority" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">All priorities</option>@foreach(['high','medium','low'] as $priority)<option value="{{ $priority }}" @selected($filters['opportunity_priority'] === $priority)>{{ ucfirst($priority) }}</option>@endforeach</select></label>
             <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Status<select name="status" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-navy"><option value="">Open</option>@foreach(['open','reviewed','in_progress','completed','ignored'] as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ str_replace('_', ' ', ucfirst($status)) }}</option>@endforeach</select></label>
-            <div class="flex items-end gap-2 md:col-span-2 xl:col-span-7"><button class="min-h-10 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white transition-transform active:scale-[0.96]">Apply Filters</button><a href="{{ route('websites.show', $website) }}" class="inline-flex min-h-10 items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.12)] transition-transform active:scale-[0.96]">Clear</a></div>
+            <div class="flex items-end gap-2 md:col-span-2 xl:col-span-6"><button class="min-h-10 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white transition-transform active:scale-[0.96]">Apply Filters</button><a href="{{ route('websites.show', $website) }}" class="inline-flex min-h-10 items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.12)] transition-transform active:scale-[0.96]">Clear</a></div>
         </form>
     </section>
 
@@ -144,8 +145,8 @@
     </section>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        @include('websites.partials.growth-opportunities', ['opportunities' => $serviceOpportunities, 'title' => 'Service Growth Opportunities'])
-        @include('websites.partials.growth-opportunities', ['opportunities' => $brandedOpportunities, 'title' => 'Branded & Reputation Searches'])
+        @include('websites.partials.growth-opportunities', ['opportunities' => $serviceOpportunities, 'title' => 'Service Growth Opportunities', 'empty' => 'No service-growth opportunities match the current filters.'])
+        @include('websites.partials.growth-opportunities', ['opportunities' => $brandedOpportunities, 'title' => 'Branded & Reputation Searches', 'empty' => 'No branded or reputation searches match the current filters.'])
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
@@ -154,21 +155,25 @@
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
+        @include('websites.partials.gsc-countries', ['countries' => $countryMetrics, 'targetCountry' => $targetCountry])
+        @include('websites.partials.gsc-devices', ['devices' => $deviceMetrics])
+    </div>
+
+    <div class="mt-6 grid gap-6">
         @include('websites.partials.gsc-pages', ['pageRecommendations' => $pageRecommendations])
-        @include('websites.partials.gsc-queries', ['queries' => $filteredQueries, 'queryIntents' => $queryIntents])
+        @include('websites.partials.gsc-queries', ['queryRows' => $queryRows])
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        @include('websites.partials.gsc-devices', ['devices' => $website->relationLoaded('gscDevices') ? $website->gscDevices : collect()])
         @include('websites.partials.insights', ['insights' => $website->aiInsights])
-    </div>
-
-    <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        @include('websites.partials.audits', ['audits' => $website->seoAudits])
         <section class="rounded-lg bg-white shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]">
             <div class="border-b border-slate-100 px-5 py-4"><h2 class="font-semibold text-navy">Marketing Tasks</h2></div>
             <div class="divide-y divide-slate-100">@forelse($website->marketingTasks as $task)<div class="px-5 py-4"><p class="font-semibold">{{ $task->title }}</p><p class="text-sm text-slate-500">{{ ucfirst($task->priority) }} · {{ str_replace('_',' ', $task->status) }}</p></div>@empty<div class="px-5 py-10 text-center text-sm text-slate-500">No tasks yet.</div>@endforelse</div>
         </section>
+    </div>
+
+    <div class="mt-6 grid gap-6 xl:grid-cols-2">
+        @include('websites.partials.audits', ['audits' => $website->seoAudits])
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
