@@ -55,14 +55,19 @@ class WebsiteController extends Controller
             'device' => $request->query('device'),
             'query_intent' => $request->query('query_intent'),
             'page_type' => $request->query('page_type'),
+            'opportunity_category' => $request->query('opportunity_category'),
             'opportunity_priority' => $request->query('opportunity_priority'),
+            'status' => $request->query('status'),
         ];
+        $opportunityStatus = $filters['status'] ?: 'open';
 
         $mobileClicks = $hasGscTables ? (int) $website->gscDevices()->where('device', 'mobile')->latest()->value('clicks') : 0;
         $topPriority = $hasGrowth
             ? $website->growthOpportunities()
-                ->where('status', 'open')
+                ->where('status', $opportunityStatus)
                 ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['acquisition_growth', 'service_page_growth', 'conversion_improvement']))
+                ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
+                ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
                 ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
                 ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
                 ->first()
@@ -87,8 +92,9 @@ class WebsiteController extends Controller
 
         if ($hasGrowth) {
             $relations['growthOpportunities'] = fn ($query) => $query
-                ->where('status', 'open')
+                ->where('status', $opportunityStatus)
                 ->when($hasGrowthCategory, fn ($query) => $query->whereNotIn('opportunity_category', ['branded_visibility', 'reputation_conversion', 'low_value']))
+                ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
                 ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
                 ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
                 ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
@@ -111,8 +117,9 @@ class WebsiteController extends Controller
             : false;
 
         $serviceOpportunities = $hasGrowth ? $website->growthOpportunities()
-            ->where('status', 'open')
+            ->where('status', $opportunityStatus)
             ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['acquisition_growth', 'service_page_growth']))
+            ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
             ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
             ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
             ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
@@ -120,8 +127,9 @@ class WebsiteController extends Controller
             ->get() : collect();
 
         $brandedOpportunities = $hasGrowth ? $website->growthOpportunities()
-            ->where('status', 'open')
+            ->where('status', $opportunityStatus)
             ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['branded_visibility', 'reputation_conversion']))
+            ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
             ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
             ->orderByDesc('impressions')
             ->limit(6)
@@ -164,6 +172,81 @@ class WebsiteController extends Controller
             ->orderBy('country')
             ->pluck('country') : collect();
 
+        $dateScopedPages = $hasGscTables ? $website->gscPages()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->when(! $latestSync && filled($filters['date_start']), fn ($query) => $query->where('date_start', $filters['date_start']))
+            ->when(! $latestSync && filled($filters['date_end']), fn ($query) => $query->where('date_end', $filters['date_end']))
+            ->get() : collect();
+
+        $dateScopedQueries = $hasGscTables ? $website->gscQueries()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->when(! $latestSync && filled($filters['date_start']), fn ($query) => $query->where('date_start', $filters['date_start']))
+            ->when(! $latestSync && filled($filters['date_end']), fn ($query) => $query->where('date_end', $filters['date_end']))
+            ->get() : collect();
+
+        $servicePageClicks = $dateScopedPages
+            ->filter(fn ($page) => $classifier->pageType($page->page_url, $website) === 'service_page')
+            ->sum('clicks');
+
+        $brandedClicks = $dateScopedQueries
+            ->filter(fn ($query) => in_array($classifier->classifyQueryIntent($query->query, $website), ['branded_practitioner', 'review_reputation'], true))
+            ->sum('clicks');
+
+        $topDevice = $hasGscTables ? $website->gscDevices()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->orderByDesc('clicks')
+            ->first() : null;
+
+        $topCountry = $hasGscCountries ? $website->gscCountries()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->orderByDesc('clicks')
+            ->first() : null;
+
+        $trendRows = $hasGscTables ? $website->gscDailyMetrics()
+            ->when($latestSync, fn ($query) => $query->whereBetween('date', [$latestSync->date_start->toDateString(), $latestSync->date_end->toDateString()]))
+            ->when(! $latestSync && filled($filters['date_start']), fn ($query) => $query->where('date', '>=', $filters['date_start']))
+            ->when(! $latestSync && filled($filters['date_end']), fn ($query) => $query->where('date', '<=', $filters['date_end']))
+            ->orderBy('date')
+            ->get(['date', 'clicks', 'impressions', 'ctr', 'position']) : collect();
+
+        $deviceRows = $hasGscTables ? $website->gscDevices()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->selectRaw('device, SUM(clicks) as clicks')
+            ->groupBy('device')
+            ->orderByDesc('clicks')
+            ->get() : collect();
+
+        $countryRows = $hasGscCountries ? $website->gscCountries()
+            ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
+            ->selectRaw('country, SUM(clicks) as clicks')
+            ->groupBy('country')
+            ->orderByDesc('clicks')
+            ->limit(8)
+            ->get() : collect();
+
+        $profile = $website->serviceProfile();
+        $targetCountry = collect($profile['target_locations'] ?? [])
+            ->first(fn ($location) => in_array(strtolower((string) $location), ['france', 'suisse', 'switzerland'], true))
+            ?: 'Not set';
+
+        $chartData = [
+            'trend' => [
+                'labels' => $trendRows->map(fn ($row) => $row->date->format('M j'))->values(),
+                'clicks' => $trendRows->pluck('clicks')->values(),
+                'impressions' => $trendRows->pluck('impressions')->values(),
+                'ctr' => $trendRows->map(fn ($row) => round((float) $row->ctr, 2))->values(),
+                'position' => $trendRows->map(fn ($row) => round((float) $row->position, 1))->values(),
+            ],
+            'devices' => [
+                'labels' => $deviceRows->pluck('device')->map(fn ($device) => ucfirst((string) $device))->values(),
+                'clicks' => $deviceRows->pluck('clicks')->map(fn ($clicks) => (int) $clicks)->values(),
+            ],
+            'countries' => [
+                'labels' => $countryRows->pluck('country')->values(),
+                'clicks' => $countryRows->pluck('clicks')->map(fn ($clicks) => (int) $clicks)->values(),
+            ],
+        ];
+
         return view('websites.show', [
             'website' => $website,
             'googleAccount' => GoogleAccount::with('sites')->where('user_id', Auth::id())->where('provider', 'google')->first(),
@@ -178,6 +261,12 @@ class WebsiteController extends Controller
             'filters' => $filters,
             'propertyMismatch' => $propertyMismatch,
             'mobileClicks' => $mobileClicks,
+            'topCountry' => $topCountry,
+            'topDevice' => $topDevice,
+            'servicePageClicks' => (int) $servicePageClicks,
+            'brandedClicks' => (int) $brandedClicks,
+            'targetCountry' => $targetCountry,
+            'chartData' => $chartData,
             'openConversionOpportunities' => $hasGrowth ? $website->growthOpportunities()->where('status', 'open')->whereIn('opportunity_type', ['improve_booking_cta', 'mobile_conversion', 'increase_ctr_and_conversion'])->count() : 0,
             'topPriority' => $topPriority,
             'pageRecommendations' => $pageRows->map(fn ($page) => [
