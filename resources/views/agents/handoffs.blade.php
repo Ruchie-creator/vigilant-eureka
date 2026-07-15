@@ -1,0 +1,11 @@
+<x-layouts.app heading="Agent Handoffs">
+    <section class="rounded-lg bg-navy p-6 text-white shadow-[0_18px_50px_rgba(5,18,55,0.22)]"><p class="text-xs font-bold uppercase tracking-[.18em] text-teal-200">Team coordination</p><h2 class="mt-2 text-2xl font-bold">Agent Handoffs</h2><p class="mt-2 max-w-2xl text-sm text-slate-300">Track specialist requests, expected outputs, and unresolved work across the marketing team.</p></section>
+    <form method="GET" class="mt-6 grid gap-3 rounded-lg bg-white p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06)] sm:grid-cols-2 xl:grid-cols-[1fr_1fr_180px_auto]">
+        <select name="website_id" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-navy"><option value="">All workspaces</option>@foreach($websites as $website)<option value="{{ $website->id }}" @selected(request('website_id') == $website->id)>{{ $website->name }}</option>@endforeach</select>
+        <select name="agent_id" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-navy"><option value="">All agents</option>@foreach($agents as $agent)<option value="{{ $agent->id }}" @selected(request('agent_id') == $agent->id)>{{ $agent->name }}</option>@endforeach</select>
+        <select name="status" class="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-navy"><option value="">All statuses</option>@foreach(['pending','accepted','completed','ignored','failed'] as $status)<option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>@endforeach</select>
+        <button class="min-h-10 rounded-lg bg-navy px-4 text-sm font-semibold text-white">Filter</button>
+    </form>
+    <section class="mt-6 grid gap-3">@forelse($handoffs as $handoff)@include('agents.partials.handoff-card', ['handoff' => $handoff])@empty<div class="rounded-lg bg-white px-6 py-14 text-center"><i data-lucide="git-pull-request-arrow" class="mx-auto size-8 text-slate-300"></i><p class="mt-3 font-semibold text-navy">No handoffs found</p><p class="mt-1 text-sm text-slate-500">Agent coordination requests will appear after relevant specialist findings.</p></div>@endforelse</section>
+    <div class="mt-6">{{ $handoffs->links() }}</div>
+</x-layouts.app>

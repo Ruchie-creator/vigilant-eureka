@@ -138,6 +138,9 @@ class Website extends Model
         return $this->hasMany(AgentAction::class);
     }
 
+    public function agentMemories(): HasMany { return $this->hasMany(AgentMemory::class); }
+    public function agentHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class); }
+
     public function serviceProfile(): array
     {
         $defaults = $this->defaultServiceProfile();

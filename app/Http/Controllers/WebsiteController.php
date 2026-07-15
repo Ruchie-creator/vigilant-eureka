@@ -11,6 +11,8 @@ use App\Services\GrowthOpportunityGenerator;
 use App\Services\SearchConsolePropertyMatcher;
 use App\Services\ConversionGoalProfileService;
 use App\Services\ConversionCheckService;
+use App\Services\Agents\AgentMemoryService;
+use App\Models\Agent;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -488,7 +490,7 @@ class WebsiteController extends Controller
         return view('websites.form', ['website' => $website, 'goalProfiles' => $goalProfiles->profiles()]);
     }
 
-    public function update(Request $request, Website $website, ConversionGoalProfileService $goalProfiles, ConversionCheckService $conversionChecks): RedirectResponse
+    public function update(Request $request, Website $website, ConversionGoalProfileService $goalProfiles, ConversionCheckService $conversionChecks, AgentMemoryService $memories): RedirectResponse
     {
         $data = $this->validated($request, $goalProfiles);
         SafeUrl::assertPublicHttpUrl($data['url']);
@@ -498,6 +500,9 @@ class WebsiteController extends Controller
         if ($goalChanged) {
             $website->conversionChecks()->delete();
             $conversionChecks->ensureDefaults($website);
+            foreach (Agent::where('status', 'active')->get() as $agent) {
+                $memories->updateOrRemember($agent, $website, 'conversion_goal_context', 'primary-conversion-goal', 'The primary conversion goal is '.$data['primary_conversion_goal'].'.', ['confidence' => 1, 'source_type' => 'workspace', 'source_id' => $website->id]);
+            }
         }
 
         return redirect()->route('websites.show', $website)->with('success', 'Workspace updated.');

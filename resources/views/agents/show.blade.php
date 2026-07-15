@@ -8,6 +8,11 @@
 
     <section class="mt-6 rounded-lg bg-white p-5 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]"><h2 class="font-bold text-navy">Instructions</h2><p class="mt-2 text-sm leading-6 text-slate-600">{{ $agent->instructions ?: 'Use connected workspace evidence and create reviewable recommendations.' }}</p><div class="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"><i data-lucide="shield-alert" class="size-4"></i>External actions require human approval.</div></section>
 
+    <section class="mt-6 grid gap-5 xl:grid-cols-2">
+        <div class="rounded-lg bg-white p-5 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]"><div class="flex items-center justify-between gap-3"><div><h2 class="font-bold text-navy">Agent Memory</h2><p class="mt-1 text-sm text-slate-500">Context carried into future runs.</p></div><a href="{{ route('agents.memories.index', $agent) }}" class="text-sm font-semibold text-teal">View all</a></div><div class="mt-4 grid gap-3">@forelse($memories->take(3) as $memory)@include('agents.partials.memory-card', ['memory' => $memory])@empty<p class="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">No agent memory yet.</p>@endforelse</div></div>
+        <div class="rounded-lg bg-white p-5 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]"><div class="flex items-center justify-between gap-3"><div><h2 class="font-bold text-navy">Agent Handoffs</h2><p class="mt-1 text-sm text-slate-500">Requests sent and received by this specialist.</p></div><a href="{{ route('agent-handoffs.index', ['agent_id' => $agent->id]) }}" class="text-sm font-semibold text-teal">View all</a></div><div class="mt-4 grid gap-3">@forelse($handoffs->take(3) as $handoff)@include('agents.partials.handoff-card', ['handoff' => $handoff])@empty<p class="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">No handoffs yet.</p>@endforelse</div></div>
+    </section>
+
     <div class="mt-6 space-y-5">
         @forelse($runs as $run)
             <section>

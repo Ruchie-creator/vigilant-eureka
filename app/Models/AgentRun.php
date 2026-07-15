@@ -39,4 +39,9 @@ class AgentRun extends Model
     {
         return $this->hasMany(self::class, 'parent_run_id');
     }
+
+    public function handoffs(): HasMany
+    {
+        return $this->hasMany(AgentHandoff::class);
+    }
 }

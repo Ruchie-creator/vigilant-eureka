@@ -4,6 +4,8 @@ use App\Http\Controllers\AiInsightController;
 use App\Http\Controllers\AgentActionController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AgentRunController;
+use App\Http\Controllers\AgentMemoryController;
+use App\Http\Controllers\AgentHandoffController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConversionEventController;
 use App\Http\Controllers\DashboardController;
@@ -42,6 +44,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/websites/{website}/agents/run-full-team', [AgentRunController::class, 'fullTeam'])->name('websites.agents.run-full-team');
     Route::patch('/agent-actions/{agentAction}', [AgentActionController::class, 'update'])->name('agent-actions.update');
     Route::post('/agent-actions/{agentAction}/tasks', [AgentActionController::class, 'storeTask'])->name('agent-actions.tasks.store');
+    Route::get('/agents/{agent}/memories', [AgentMemoryController::class, 'index'])->name('agents.memories.index');
+    Route::post('/agents/{agent}/memories', [AgentMemoryController::class, 'store'])->name('agents.memories.store');
+    Route::delete('/agent-memories/{agentMemory}', [AgentMemoryController::class, 'destroy'])->name('agent-memories.destroy');
+    Route::patch('/agent-memories/{agentMemory}/expire', [AgentMemoryController::class, 'expire'])->name('agent-memories.expire');
+    Route::get('/agent-memories', [AgentMemoryController::class, 'all'])->name('agent-memories.index');
+    Route::get('/agent-handoffs', [AgentHandoffController::class, 'index'])->name('agent-handoffs.index');
+    Route::patch('/agent-handoffs/{agentHandoff}', [AgentHandoffController::class, 'update'])->name('agent-handoffs.update');
 
     Route::resource('websites', WebsiteController::class);
     Route::get('/websites/{website}/gsc-queries', [WebsiteController::class, 'gscQueries'])->name('websites.gsc-queries.index');

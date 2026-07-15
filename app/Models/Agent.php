@@ -19,4 +19,8 @@ class Agent extends Model
     {
         return $this->hasOne(AgentRun::class)->latestOfMany();
     }
+
+    public function memories(): HasMany { return $this->hasMany(AgentMemory::class); }
+    public function outgoingHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class, 'from_agent_id'); }
+    public function incomingHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class, 'to_agent_id'); }
 }

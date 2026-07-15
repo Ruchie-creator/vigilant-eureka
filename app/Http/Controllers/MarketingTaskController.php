@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AiInsight;
 use App\Models\MarketingTask;
 use App\Models\Website;
+use App\Models\AgentAction;
+use App\Services\Agents\AgentMemoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -80,20 +82,22 @@ class MarketingTaskController extends Controller
         ]);
     }
 
-    public function update(Request $request, MarketingTask $marketingTask): RedirectResponse
+    public function update(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories): RedirectResponse
     {
         $marketingTask->update($this->validated($request));
+        $this->rememberCompletedAgentTask($marketingTask, $memories);
 
         return redirect()->route('marketing-tasks.index')->with('success', 'Task updated.');
     }
 
-    public function updateStatus(Request $request, MarketingTask $marketingTask): RedirectResponse
+    public function updateStatus(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories): RedirectResponse
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(['pending', 'in_progress', 'completed', 'ignored'])],
         ]);
 
         $marketingTask->update($data);
+        $this->rememberCompletedAgentTask($marketingTask, $memories);
 
         return back()->with('success', 'Task status updated.');
     }
@@ -139,5 +143,12 @@ class MarketingTaskController extends Controller
             'status' => ['required', Rule::in(['pending', 'in_progress', 'completed', 'ignored'])],
             'due_date' => ['nullable', 'date'],
         ]);
+    }
+
+    private function rememberCompletedAgentTask(MarketingTask $task, AgentMemoryService $memories): void
+    {
+        if ($task->status !== 'completed' || $task->source_type !== 'agent_action') return;
+        $action = AgentAction::with(['run.agent', 'website'])->where('created_task_id', $task->id)->first();
+        if ($action) $memories->updateOrRemember($action->run->agent, $action->website, 'completed_task', 'marketing-task:'.$task->id, 'Completed task: '.$task->title, ['confidence' => 1, 'source_type' => 'marketing_task', 'source_id' => $task->id]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Agents;
 
 use App\Models\Agent;
 use App\Models\AgentAction;
+use App\Models\AgentHandoff;
 use App\Models\AgentRun;
 use App\Models\Website;
 use App\Services\ConversionGoalProfileService;
@@ -20,7 +21,30 @@ abstract class AgentService
     public function run(Agent $agent, Website $website, string $runType = 'manual', array $runMetadata = [], ?AgentRun $existingRun = null): AgentRun
     {
         $goal = $this->goalProfiles->forWebsite($website);
-        $inputSummary = 'Analyze '.$website->name.' for '.$goal['label'].' using connected workspace evidence.';
+        $memoryService = app(AgentMemoryService::class);
+        $handoffService = app(AgentHandoffService::class);
+        $memoryContext = $memoryService->buildAgentMemoryContext($agent, $website);
+        $handoffContext = $handoffService->buildHandoffContext($agent, $website);
+        $inputSummary = 'Analyze '.$website->name.' for '.$goal['label'].' using connected workspace evidence.'
+            .' Memory context: '.json_encode($memoryContext, JSON_UNESCAPED_SLASHES)
+            .' Accepted handoffs: '.json_encode($handoffContext, JSON_UNESCAPED_SLASHES);
+        if ($agent->slug === 'marketing-director') {
+            $openTasks = $website->marketingTasks()->whereIn('status', ['pending', 'in_progress'])->latest()->limit(10)->pluck('title')->all();
+            $handoffHistory = AgentHandoff::with(['fromAgent', 'toAgent'])
+                ->where('website_id', $website->id)
+                ->whereIn('status', ['pending', 'accepted', 'completed', 'failed', 'ignored'])
+                ->latest()
+                ->limit(20)
+                ->get()
+                ->map(fn (AgentHandoff $handoff) => [
+                    'from' => $handoff->fromAgent->slug,
+                    'to' => $handoff->toAgent->slug,
+                    'reason' => $handoff->reason,
+                    'status' => $handoff->status,
+                ])->all();
+            $inputSummary .= ' Existing open tasks: '.json_encode($openTasks, JSON_UNESCAPED_SLASHES)
+                .' Team handoff history: '.json_encode($handoffHistory, JSON_UNESCAPED_SLASHES);
+        }
         $attributes = [
             'agent_id' => $agent->id,
             'website_id' => $website->id,
@@ -31,7 +55,7 @@ abstract class AgentService
             'status' => 'pending',
             'input_summary' => $inputSummary,
             'input_hash' => hash('sha256', $inputSummary),
-            'metadata' => [...$runMetadata, 'conversion_goal' => $goal['key'], 'approval_required' => $goal['approval_required']],
+            'metadata' => [...$runMetadata, 'conversion_goal' => $goal['key'], 'approval_required' => $goal['approval_required'], 'memory_context' => $memoryContext, 'handoff_context' => $handoffContext],
         ];
         $run = $existingRun ?: AgentRun::create($attributes);
 
@@ -56,7 +80,7 @@ abstract class AgentService
                 ...($action['metadata'] ?? []),
             ];
 
-            AgentAction::create([
+            $createdAction = AgentAction::create([
                 'agent_run_id' => $run->id,
                 'website_id' => $website->id,
                 'action_type' => $action['type'],
@@ -69,6 +93,16 @@ abstract class AgentService
                 'expected_result' => $action['expected'],
                 'metadata' => $metadata,
             ]);
+
+            foreach ($handoffContext as $handoff) {
+                $record = \App\Models\AgentHandoff::find($handoff['id']);
+                if ($record?->status === 'accepted') $handoffService->completeHandoff($record);
+            }
+            $handoffService->createStructuredHandoffs($createdAction, $run->loadMissing(['agent', 'website']));
+
+            if ($agent->slug === 'marketing-director') {
+                $memoryService->updateOrRemember($agent, $website, 'previous_decision', 'director-priority', 'Selected priority: '.$createdAction->title, ['confidence' => 0.9, 'source_type' => 'agent_action', 'source_id' => $createdAction->id]);
+            }
 
             $outputSummary = $action['found'].' Recommended: '.$action['recommended'];
             $duration = $this->duration($timer);
@@ -86,6 +120,10 @@ abstract class AgentService
             $duration = $this->duration($timer);
             $error = $this->safeError($exception->getMessage());
             $run->update(['status' => 'failed', 'error_message' => Str::limit($error, 2000), 'duration_ms' => $duration, 'completed_at' => now()]);
+            foreach ($handoffContext as $handoff) {
+                $record = \App\Models\AgentHandoff::find($handoff['id']);
+                if ($record?->status === 'accepted') $handoffService->failHandoff($record);
+            }
             if (! ($runMetadata['orchestration_parent'] ?? false)) {
                 $this->logRun($agent, $website, $runType, 'failed', $duration, $error);
             }
