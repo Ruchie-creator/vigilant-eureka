@@ -8,6 +8,7 @@ use App\Models\AgentRun;
 use App\Models\AgentSchedule;
 use App\Models\MarketingTask;
 use App\Models\WeeklyMarketingPlan;
+use App\Models\ActionOutcome;
 use App\Services\Agents\AgentRunSanitizer;
 use App\Services\Agents\AgentScheduleService;
 use App\Services\Agents\AgentTeamService;
@@ -23,7 +24,7 @@ class AgentOperationsController extends Controller
         $runs = AgentRun::with(['website', 'agent'])->withCount('actions')->latest()->limit(30)->get();
         $pendingApprovals = AgentAction::whereIn('status', ['pending', 'reviewed'])->count() + MarketingTask::where('approval_status', 'pending')->count() + WeeklyMarketingPlan::where('status', 'draft')->count();
         return view('agent-operations.index', [
-            'summary' => ['active_runs' => AgentRun::whereIn('status', ['pending', 'running'])->count(), 'completed_today' => AgentRun::where('status', 'completed')->whereDate('completed_at', today())->count(), 'failed_runs' => AgentRun::where('status', 'failed')->count(), 'pending_approvals' => $pendingApprovals, 'pending_handoffs' => AgentHandoff::whereIn('status', ['pending', 'accepted'])->count(), 'due_schedules' => $schedules->dueSchedules()->count(), 'pending_plans' => WeeklyMarketingPlan::where('status', 'draft')->count(), 'agent_tasks' => MarketingTask::whereIn('source_type', ['agent_action', 'weekly_marketing_plan'])->count()],
+            'summary' => ['active_runs' => AgentRun::whereIn('status', ['pending', 'running'])->count(), 'completed_today' => AgentRun::where('status', 'completed')->whereDate('completed_at', today())->count(), 'failed_runs' => AgentRun::where('status', 'failed')->count(), 'pending_approvals' => $pendingApprovals, 'pending_handoffs' => AgentHandoff::whereIn('status', ['pending', 'accepted'])->count(), 'due_schedules' => $schedules->dueSchedules()->count(), 'pending_plans' => WeeklyMarketingPlan::where('status', 'draft')->count(), 'agent_tasks' => MarketingTask::whereIn('source_type', ['agent_action', 'weekly_marketing_plan'])->count(), 'outcomes_waiting' => ActionOutcome::where('status', 'waiting')->count(), 'outcomes_due' => ActionOutcome::where('status', 'waiting')->whereDate('evaluation_end', '<=', today())->count(), 'outcomes_improved' => ActionOutcome::where('status', 'improved')->count(), 'outcomes_no_change' => ActionOutcome::where('status', 'no_change')->count(), 'outcomes_declined' => ActionOutcome::where('status', 'declined')->count(), 'outcomes_inconclusive' => ActionOutcome::where('status', 'inconclusive')->count()],
             'runs' => $runs,
             'upcomingSchedules' => AgentSchedule::with(['website', 'agent'])->where('enabled', true)->whereNotNull('next_run_at')->orderBy('next_run_at')->limit(8)->get(),
             'eventRuns' => AgentRun::with(['website', 'agent'])->where('trigger_type', 'gsc_sync')->latest()->limit(8)->get(),

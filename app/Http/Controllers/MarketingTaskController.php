@@ -7,6 +7,7 @@ use App\Models\MarketingTask;
 use App\Models\Website;
 use App\Models\AgentAction;
 use App\Services\Agents\AgentMemoryService;
+use App\Services\Agents\ActionOutcomeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,7 +26,7 @@ class MarketingTaskController extends Controller
             'origin' => $request->query('origin'),
         ];
 
-        $query = MarketingTask::with(['website', 'aiInsight', 'growthOpportunity'])
+        $query = MarketingTask::with(['website', 'aiInsight', 'growthOpportunity', 'outcome'])
             ->when(filled($filters['website_id']), fn ($query) => $query->where('website_id', $filters['website_id']))
             ->when(filled($filters['priority']), fn ($query) => $query->where('priority', $filters['priority']))
             ->when(filled($filters['status']), fn ($query) => $query->where('status', $filters['status']))
@@ -82,15 +83,16 @@ class MarketingTaskController extends Controller
         ]);
     }
 
-    public function update(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories): RedirectResponse
+    public function update(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories, ActionOutcomeService $outcomes): RedirectResponse
     {
         $marketingTask->update($this->validated($request));
         $this->rememberCompletedAgentTask($marketingTask, $memories);
+        $outcomes->createForCompletedTask($marketingTask);
 
         return redirect()->route('marketing-tasks.index')->with('success', 'Task updated.');
     }
 
-    public function updateStatus(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories): RedirectResponse
+    public function updateStatus(Request $request, MarketingTask $marketingTask, AgentMemoryService $memories, ActionOutcomeService $outcomes): RedirectResponse
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(['pending', 'in_progress', 'completed', 'ignored'])],
@@ -98,6 +100,7 @@ class MarketingTaskController extends Controller
 
         $marketingTask->update($data);
         $this->rememberCompletedAgentTask($marketingTask, $memories);
+        $outcomes->createForCompletedTask($marketingTask);
 
         return back()->with('success', 'Task status updated.');
     }

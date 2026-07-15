@@ -36,5 +36,6 @@
             <form method="POST" action="{{ route('agent-actions.update', $action) }}">@csrf @method('PATCH')<input type="hidden" name="status" value="ignored"><button class="min-h-10 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_0_0_1px_rgba(5,18,55,0.12)]">Ignore</button></form>
             <form method="POST" action="{{ route('agent-actions.update', $action) }}">@csrf @method('PATCH')<input type="hidden" name="status" value="completed"><button class="min-h-10 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_0_0_1px_rgba(5,18,55,0.12)]">Mark Completed</button></form>
         </div>
+        @if($action->outcome)<a href="{{ route('action-outcomes.show',$action->outcome) }}" class="mt-4 flex items-center justify-between rounded-lg bg-teal/5 px-4 py-3 text-sm"><span><strong class="text-navy">Outcome: {{ str_replace('_',' ',ucfirst($action->outcome->status)) }}</strong><span class="mt-1 block text-xs text-slate-500">{{ $action->outcome->outcome_summary ?: 'Waiting for the complete evaluation period.' }}</span></span><i data-lucide="arrow-right" class="size-4 text-teal"></i></a>@endif
     </article>
 @endif

@@ -49,6 +49,7 @@
                             @if($category)<p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ str_replace('_', ' ', $category) }}</p>@endif
                             <p class="mt-3 text-sm leading-6 text-slate-600">{{ $task->expected_result ?: $task->description ?: 'Define the expected conversion result before implementation.' }}</p>
                             <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Due: <span class="normal-case tracking-normal text-slate-700">{{ $task->due_date?->format('M j, Y') ?: 'No due date' }}</span></p>
+                            @if($task->outcome)<a href="{{ route('action-outcomes.show',$task->outcome) }}" class="mt-3 flex items-center justify-between rounded-lg bg-teal/5 px-3 py-2 text-xs font-semibold text-teal"><span>Outcome: {{ str_replace('_',' ',ucfirst($task->outcome->status)) }}</span><i data-lucide="arrow-right" class="size-3.5"></i></a>@endif
                             <div class="mt-4 flex flex-wrap gap-2">
                                 @foreach($statuses as $nextStatus => $nextLabel)
                                     @if($nextStatus !== $task->status)

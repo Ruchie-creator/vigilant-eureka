@@ -53,4 +53,5 @@ class MarketingTask extends Model
 
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function agentAction(): HasOne { return $this->hasOne(AgentAction::class, 'created_task_id'); }
+    public function outcome(): HasOne { return $this->hasOne(ActionOutcome::class); }
 }

@@ -143,6 +143,7 @@ class Website extends Model
     public function agentHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class); }
     public function agentSchedules(): HasMany { return $this->hasMany(AgentSchedule::class); }
     public function weeklyMarketingPlans(): HasMany { return $this->hasMany(WeeklyMarketingPlan::class); }
+    public function actionOutcomes(): HasMany { return $this->hasMany(ActionOutcome::class); }
 
     public function serviceProfile(): array
     {

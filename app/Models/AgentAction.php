@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AgentAction extends Model
 {
@@ -31,4 +32,5 @@ class AgentAction extends Model
 
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function originalAction(): BelongsTo { return $this->belongsTo(self::class, 'original_action_id'); }
+    public function outcome(): HasOne { return $this->hasOne(ActionOutcome::class); }
 }

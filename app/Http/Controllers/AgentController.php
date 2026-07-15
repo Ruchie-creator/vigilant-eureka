@@ -9,6 +9,7 @@ use App\Models\AgentMemory;
 use App\Models\Website;
 use App\Models\MarketingTask;
 use App\Models\WeeklyMarketingPlan;
+use App\Models\ActionOutcome;
 use App\Services\ConversionGoalProfileService;
 use Illuminate\View\View;
 
@@ -65,6 +66,12 @@ class AgentController extends Controller
                 'latest_plan' => $latestPlan,
                 'unresolved_handoffs' => $handoffs->whereIn('status', ['pending', 'accepted', 'failed'])->count(),
                 'recent_failure' => $website->agentRuns()->with('agent')->where('status', 'failed')->latest()->first(),
+                'outcomes_waiting' => $website->actionOutcomes()->where('status', 'waiting')->count(),
+                'outcomes_due' => $website->actionOutcomes()->where('status', 'waiting')->whereDate('evaluation_end', '<=', today())->count(),
+                'outcomes_improved' => $website->actionOutcomes()->where('status', 'improved')->count(),
+                'outcomes_no_change' => $website->actionOutcomes()->where('status', 'no_change')->count(),
+                'outcomes_declined' => $website->actionOutcomes()->where('status', 'declined')->count(),
+                'outcomes_inconclusive' => $website->actionOutcomes()->where('status', 'inconclusive')->count(),
             ],
         ]);
     }

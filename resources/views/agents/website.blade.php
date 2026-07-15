@@ -30,7 +30,11 @@
             ['Recent failed run', $operationsSummary['recent_failure']?->agent?->name ?? 'None', 'circle-alert'],
         ] as [$label,$value,$icon])<article class="rounded-lg border border-slate-200 bg-white p-4"><div class="flex items-center gap-2"><i data-lucide="{{ $icon }}" class="size-4 text-teal"></i><p class="text-xs font-semibold text-slate-500">{{ $label }}</p></div><p class="mt-2 break-words text-sm font-bold text-navy">{{ $value }}</p></article>@endforeach
     </section>
-    <div class="mt-3 flex flex-wrap gap-2"><a href="{{ route('approvals.index',['website_id'=>$website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 text-sm font-semibold text-white"><i data-lucide="inbox" class="size-4"></i>Workspace approvals</a><a href="{{ route('agent-operations.index') }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white"><i data-lucide="activity" class="size-4"></i>Agent operations</a></div>
+    <div class="mt-3 flex flex-wrap gap-2"><a href="{{ route('approvals.index',['website_id'=>$website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 text-sm font-semibold text-white"><i data-lucide="inbox" class="size-4"></i>Workspace approvals</a><a href="{{ route('agent-operations.index') }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white"><i data-lucide="activity" class="size-4"></i>Agent operations</a><a href="{{ route('action-outcomes.index',['website_id'=>$website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.1)]"><i data-lucide="chart-no-axes-combined" class="size-4"></i>Action outcomes</a></div>
+    @php
+        $outcomeCards = [['Waiting',$operationsSummary['outcomes_waiting']],['Due',$operationsSummary['outcomes_due']],['Improved',$operationsSummary['outcomes_improved']],['No change',$operationsSummary['outcomes_no_change']],['Declined',$operationsSummary['outcomes_declined']],['Inconclusive',$operationsSummary['outcomes_inconclusive']]];
+    @endphp
+    <section class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">@foreach($outcomeCards as [$label,$value])<article class="rounded-lg bg-white p-3 shadow-[0_0_0_1px_rgba(5,18,55,0.06)]"><p class="text-xs text-slate-500">{{ $label }} outcomes</p><p class="mt-1 text-xl font-bold text-navy">{{ number_format($value) }}</p></article>@endforeach</section>
 
     @php
         $runButtons = [
