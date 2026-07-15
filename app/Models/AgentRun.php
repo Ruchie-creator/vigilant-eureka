@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AgentRun extends Model
 {
-    protected $fillable = ['agent_id', 'website_id', 'run_type', 'status', 'input_summary', 'output_summary', 'metadata', 'started_at', 'completed_at', 'error_message'];
+    protected $fillable = ['agent_id', 'website_id', 'run_type', 'trigger_type', 'correlation_id', 'parent_run_id', 'retry_count', 'duration_ms', 'input_hash', 'output_hash', 'status', 'input_summary', 'output_summary', 'metadata', 'started_at', 'completed_at', 'error_message'];
 
     protected function casts(): array
     {
-        return ['metadata' => 'array', 'started_at' => 'datetime', 'completed_at' => 'datetime'];
+        return ['metadata' => 'array', 'started_at' => 'datetime', 'completed_at' => 'datetime', 'retry_count' => 'integer', 'duration_ms' => 'integer'];
     }
 
     public function agent(): BelongsTo
@@ -28,5 +28,15 @@ class AgentRun extends Model
     public function actions(): HasMany
     {
         return $this->hasMany(AgentAction::class);
+    }
+
+    public function parentRun(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_run_id');
+    }
+
+    public function childRuns(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_run_id');
     }
 }

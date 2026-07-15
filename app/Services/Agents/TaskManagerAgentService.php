@@ -15,7 +15,7 @@ class TaskManagerAgentService extends AgentService
             ->whereNull('created_task_id')
             ->whereIn('status', ['pending', 'reviewed', 'approved'])
             ->whereHas('run.agent', fn ($query) => $query->where('slug', '!=', 'task-manager'))
-            ->orderByRaw("FIELD(priority, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->latest()
             ->first();
 

@@ -9,7 +9,7 @@ class ConversionAgentService extends AgentService
     protected function action(Website $website, array $goal): array
     {
         $opportunity = $this->topOpportunity($website, ['conversion_improvement']);
-        $check = $website->conversionChecks()->whereIn('status', ['missing', 'partial'])->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")->first();
+        $check = $website->conversionChecks()->whereIn('status', ['missing', 'partial'])->orderByRaw("CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END")->first();
         $eventCount = $website->conversionEvents()->where('occurred_at', '>=', now()->subDays(30))->count();
 
         if ($opportunity) {

@@ -39,9 +39,9 @@ class WebsiteController extends Controller
     {
         $data = $this->validated($request, $goalProfiles);
         SafeUrl::assertPublicHttpUrl($data['url']);
-        Website::create($data);
+        $website = Website::create($data);
 
-        return redirect()->route('websites.index')->with('success', 'Workspace added.');
+        return redirect()->route('websites.show', $website)->with('success', 'Workspace added. Select a matching Search Console property to begin syncing.');
     }
 
     public function show(Request $request, Website $website, GrowthOpportunityGenerator $classifier, ConversionGoalProfileService $goalProfiles): View
@@ -329,9 +329,16 @@ class WebsiteController extends Controller
             ->unique(fn ($action) => $action->run->agent->slug)
             ->keyBy(fn ($action) => $action->run->agent->slug);
 
+        $googleAccount = GoogleAccount::with('sites')->where('user_id', Auth::id())->where('provider', 'google')->first();
+        $matchingSearchConsoleSites = $googleAccount?->sites
+            ->filter(fn ($site) => SearchConsolePropertyMatcher::matches($website->url, $site->site_url))
+            ->sortBy('site_url')
+            ->values() ?? collect();
+
         return view('websites.show', [
             'website' => $website,
-            'googleAccount' => GoogleAccount::with('sites')->where('user_id', Auth::id())->where('provider', 'google')->first(),
+            'googleAccount' => $googleAccount,
+            'matchingSearchConsoleSites' => $matchingSearchConsoleSites,
             'gscSummary' => (object) [
                 'clicks' => $latestSync ? $latestSync->total_clicks : ($gscSummary->clicks ?? 0),
                 'impressions' => $latestSync ? $latestSync->total_impressions : ($gscSummary->impressions ?? 0),

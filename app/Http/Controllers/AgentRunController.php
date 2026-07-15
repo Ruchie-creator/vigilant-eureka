@@ -7,6 +7,7 @@ use App\Models\Website;
 use App\Services\Agents\AgentTeamService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class AgentRunController extends Controller
 {
@@ -20,7 +21,11 @@ class AgentRunController extends Controller
 
     public function fullTeam(Website $website, AgentTeamService $team): RedirectResponse
     {
-        $runs = $team->runFullTeam($website);
+        try {
+            $runs = $team->runFullTeam($website);
+        } catch (RuntimeException $exception) {
+            return redirect()->route('websites.agents.index', $website)->with('error', $exception->getMessage());
+        }
         $completed = $runs->where('status', 'completed')->count();
 
         return redirect()->route('websites.agents.index', $website)->with($completed === $runs->count() ? 'success' : 'error', $completed.' of '.$runs->count().' agent runs completed. All actions are pending review.');
