@@ -12,6 +12,7 @@ use App\Services\SearchConsolePropertyMatcher;
 use App\Services\ConversionGoalProfileService;
 use App\Services\ConversionCheckService;
 use App\Services\Agents\AgentMemoryService;
+use App\Services\Agents\AgentScheduleService;
 use App\Models\Agent;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,11 +38,12 @@ class WebsiteController extends Controller
         return view('websites.form', ['website' => new Website(), 'goalProfiles' => $goalProfiles->profiles()]);
     }
 
-    public function store(Request $request, ConversionGoalProfileService $goalProfiles): RedirectResponse
+    public function store(Request $request, ConversionGoalProfileService $goalProfiles, AgentScheduleService $schedules): RedirectResponse
     {
         $data = $this->validated($request, $goalProfiles);
         SafeUrl::assertPublicHttpUrl($data['url']);
         $website = Website::create($data);
+        $schedules->createDefaultSchedules($website);
 
         return redirect()->route('websites.show', $website)->with('success', 'Workspace added. Select a matching Search Console property to begin syncing.');
     }
@@ -633,6 +635,7 @@ class WebsiteController extends Controller
             'url' => ['required', 'url:http,https', 'max:2048'],
             'type' => ['required', Rule::in(['professional_services', 'saas', 'ecommerce', 'osteopathy', 'auriculotherapy', 'sexology', 'other'])],
             'language' => ['required', 'string', 'max:40'],
+            'timezone' => ['nullable', 'timezone'],
             'target_location' => ['nullable', 'string', 'max:255'],
             'primary_services' => ['nullable', 'string', 'max:5000'],
             'target_locations' => ['nullable', 'string', 'max:5000'],

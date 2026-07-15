@@ -6,6 +6,7 @@ use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AgentRunController;
 use App\Http\Controllers\AgentMemoryController;
 use App\Http\Controllers\AgentHandoffController;
+use App\Http\Controllers\AgentScheduleController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConversionEventController;
 use App\Http\Controllers\DashboardController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\WebsiteSearchConsoleController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WeeklyReportController;
+use App\Http\Controllers\WeeklyMarketingPlanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/track/conversions/{trackingKey}/tracker.js', [ConversionEventController::class, 'script'])
@@ -51,6 +53,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/agent-memories', [AgentMemoryController::class, 'all'])->name('agent-memories.index');
     Route::get('/agent-handoffs', [AgentHandoffController::class, 'index'])->name('agent-handoffs.index');
     Route::patch('/agent-handoffs/{agentHandoff}', [AgentHandoffController::class, 'update'])->name('agent-handoffs.update');
+    Route::get('/agent-schedules', [AgentScheduleController::class, 'index'])->name('agent-schedules.index');
+    Route::patch('/agent-schedules/{agentSchedule}', [AgentScheduleController::class, 'update'])->name('agent-schedules.update');
+    Route::patch('/agent-schedules/{agentSchedule}/toggle', [AgentScheduleController::class, 'toggle'])->name('agent-schedules.toggle');
+    Route::post('/agent-schedules/{agentSchedule}/run', [AgentScheduleController::class, 'run'])->name('agent-schedules.run');
+    Route::post('/websites/{website}/agent-schedules/defaults', [AgentScheduleController::class, 'defaults'])->name('websites.agent-schedules.defaults');
+    Route::get('/websites/{website}/weekly-marketing-plans', [WeeklyMarketingPlanController::class, 'index'])->name('websites.weekly-marketing-plans.index');
+    Route::patch('/weekly-marketing-plans/{weeklyMarketingPlan}', [WeeklyMarketingPlanController::class, 'update'])->name('weekly-marketing-plans.update');
+    Route::post('/weekly-marketing-plans/{weeklyMarketingPlan}/priorities/{priority}/task', [WeeklyMarketingPlanController::class, 'task'])->name('weekly-marketing-plans.priorities.task');
 
     Route::resource('websites', WebsiteController::class);
     Route::get('/websites/{website}/gsc-queries', [WebsiteController::class, 'gscQueries'])->name('websites.gsc-queries.index');

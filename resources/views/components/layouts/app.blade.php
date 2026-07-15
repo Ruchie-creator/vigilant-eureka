@@ -8,6 +8,7 @@
         ['label' => 'Overview', 'route' => 'dashboard', 'matches' => ['dashboard'], 'icon' => 'layout-dashboard'],
         ['label' => 'Workspaces', 'route' => 'websites.index', 'matches' => ['websites.*'], 'icon' => 'globe-2'],
         ['label' => 'AI Marketing Team', 'route' => 'agents.index', 'matches' => ['agents.*', 'agent-actions.*'], 'icon' => 'users-round'],
+        ['label' => 'Agent Schedules', 'route' => 'agent-schedules.index', 'matches' => ['agent-schedules.*', 'websites.weekly-marketing-plans.*', 'weekly-marketing-plans.*'], 'icon' => 'calendar-clock'],
         ['label' => 'SEO Audits', 'route' => 'seo-audits.index', 'matches' => ['seo-audits.*'], 'icon' => 'scan-search'],
         ['label' => 'AI Insights', 'route' => 'ai-insights.index', 'matches' => ['ai-insights.*'], 'icon' => 'sparkles'],
         ['label' => 'Marketing Tasks', 'route' => 'marketing-tasks.index', 'matches' => ['marketing-tasks.*'], 'icon' => 'list-checks'],

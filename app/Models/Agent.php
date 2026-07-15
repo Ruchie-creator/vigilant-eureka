@@ -23,4 +23,5 @@ class Agent extends Model
     public function memories(): HasMany { return $this->hasMany(AgentMemory::class); }
     public function outgoingHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class, 'from_agent_id'); }
     public function incomingHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class, 'to_agent_id'); }
+    public function schedules(): HasMany { return $this->hasMany(AgentSchedule::class); }
 }

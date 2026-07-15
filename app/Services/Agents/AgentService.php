@@ -28,6 +28,10 @@ abstract class AgentService
         $inputSummary = 'Analyze '.$website->name.' for '.$goal['label'].' using connected workspace evidence.'
             .' Memory context: '.json_encode($memoryContext, JSON_UNESCAPED_SLASHES)
             .' Accepted handoffs: '.json_encode($handoffContext, JSON_UNESCAPED_SLASHES);
+        if (filled($runMetadata['trigger_reason'] ?? null)) {
+            $inputSummary .= ' Trigger reason: '.$runMetadata['trigger_reason']
+                .'. Trigger evidence: '.json_encode($runMetadata['trigger_evidence'] ?? [], JSON_UNESCAPED_SLASHES);
+        }
         if ($agent->slug === 'marketing-director') {
             $openTasks = $website->marketingTasks()->whereIn('status', ['pending', 'in_progress'])->latest()->limit(10)->pluck('title')->all();
             $handoffHistory = AgentHandoff::with(['fromAgent', 'toAgent'])
@@ -98,7 +102,9 @@ abstract class AgentService
                 $record = \App\Models\AgentHandoff::find($handoff['id']);
                 if ($record?->status === 'accepted') $handoffService->completeHandoff($record);
             }
-            $handoffService->createStructuredHandoffs($createdAction, $run->loadMissing(['agent', 'website']));
+            if (! ($runMetadata['suppress_structured_handoffs'] ?? false)) {
+                $handoffService->createStructuredHandoffs($createdAction, $run->loadMissing(['agent', 'website']));
+            }
 
             if ($agent->slug === 'marketing-director') {
                 $memoryService->updateOrRemember($agent, $website, 'previous_decision', 'director-priority', 'Selected priority: '.$createdAction->title, ['confidence' => 0.9, 'source_type' => 'agent_action', 'source_id' => $createdAction->id]);

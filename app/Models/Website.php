@@ -20,6 +20,7 @@ class Website extends Model
         'url',
         'type',
         'language',
+        'timezone',
         'target_location',
         'primary_services',
         'target_locations',
@@ -140,6 +141,8 @@ class Website extends Model
 
     public function agentMemories(): HasMany { return $this->hasMany(AgentMemory::class); }
     public function agentHandoffs(): HasMany { return $this->hasMany(AgentHandoff::class); }
+    public function agentSchedules(): HasMany { return $this->hasMany(AgentSchedule::class); }
+    public function weeklyMarketingPlans(): HasMany { return $this->hasMany(WeeklyMarketingPlan::class); }
 
     public function serviceProfile(): array
     {

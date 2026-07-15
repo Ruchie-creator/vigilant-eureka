@@ -36,6 +36,7 @@ class AgentController extends Controller
         $actions = AgentAction::with(['run.agent', 'createdTask'])->where('website_id', $website->id)->latest()->limit(30)->get();
         $memories = AgentMemory::with('agent')->where('website_id', $website->id)->latest()->limit(8)->get();
         $handoffs = AgentHandoff::with(['fromAgent', 'toAgent'])->where('website_id', $website->id)->latest()->limit(20)->get();
+        $schedules = $website->agentSchedules()->with('agent')->get();
 
         return view('agents.website', [
             'website' => $website,
@@ -47,6 +48,13 @@ class AgentController extends Controller
             'pendingHandoffs' => $handoffs->where('status', 'pending')->take(5),
             'completedHandoffs' => $handoffs->where('status', 'completed')->take(5),
             'unresolvedHandoffs' => $handoffs->whereIn('status', ['accepted', 'failed', 'ignored'])->take(5),
+            'scheduleSummary' => [
+                'full_team' => $schedules->firstWhere('schedule_type', 'weekly_full_team'),
+                'analytics' => $schedules->firstWhere('schedule_type', 'daily_analytics'),
+                'weekly_plan' => $schedules->firstWhere('schedule_type', 'weekly_marketing_plan'),
+                'last' => $schedules->sortByDesc('last_run_at')->first(),
+            ],
+            'latestTriggerReason' => $website->agentRuns()->whereNotNull('metadata')->latest()->get()->first(fn ($run) => filled(data_get($run->metadata, 'trigger_reason')))?->metadata['trigger_reason'] ?? null,
         ]);
     }
 }

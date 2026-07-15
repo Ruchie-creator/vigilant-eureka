@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\SearchConsoleSyncCompleted;
 use App\Models\GoogleAccount;
 use App\Models\GscDailyMetric;
 use App\Models\GscCountry;
@@ -9,6 +10,7 @@ use App\Models\GscDevice;
 use App\Models\GscPage;
 use App\Models\GscQuery;
 use App\Models\GscSync;
+use App\Services\Agents\MeaningfulChangeDetector;
 use App\Models\SearchConsoleSite;
 use App\Models\User;
 use App\Models\Website;
@@ -139,6 +141,7 @@ class GoogleSearchConsoleService
         $start ??= now()->subDays(28);
         $end ??= now()->subDay();
         $syncedAt = now();
+        $previousSync = GscSync::where('website_id', $website->id)->where('status', 'success')->latest('synced_at')->first();
         $sync = GscSync::create([
             'website_id' => $website->id,
             'search_console_site_id' => $site->id,
@@ -219,6 +222,18 @@ class GoogleSearchConsoleService
             ]);
 
             $website->update(['gsc_last_synced_at' => $syncedAt]);
+            SearchConsoleSyncCompleted::dispatch(
+                $website->id,
+                $sync->id,
+                $site->site_url,
+                $start->toDateString(),
+                $end->toDateString(),
+                (int) $summary['clicks'],
+                (int) $summary['impressions'],
+                (float) $summary['ctr'],
+                (float) $summary['position'],
+                app(MeaningfulChangeDetector::class)->comparison($previousSync, $sync->fresh())
+            );
         } catch (Throwable $exception) {
             $sync->update([
                 'status' => 'failed',

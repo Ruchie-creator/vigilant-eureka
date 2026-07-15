@@ -33,7 +33,7 @@ class AgentTeamService
         return app(self::SERVICES[$agent->slug])->run($agent, $website, $runType, $metadata, $existingRun);
     }
 
-    public function runFullTeam(Website $website, string $triggerType = 'manual'): Collection
+    public function runFullTeam(Website $website, string $triggerType = 'manual', array $metadata = []): Collection
     {
         $lock = Cache::lock('agent-team:workspace:'.$website->id, 300);
 
@@ -42,13 +42,13 @@ class AgentTeamService
         }
 
         try {
-            return $this->runLockedTeam($website, $triggerType);
+            return $this->runLockedTeam($website, $triggerType, $metadata);
         } finally {
             $lock->release();
         }
     }
 
-    private function runLockedTeam(Website $website, string $triggerType): Collection
+    private function runLockedTeam(Website $website, string $triggerType, array $metadata): Collection
     {
         $timer = hrtime(true);
         $correlationId = (string) Str::uuid();
@@ -68,7 +68,7 @@ class AgentTeamService
             'status' => 'pending',
             'input_summary' => $input,
             'input_hash' => hash('sha256', $input),
-            'metadata' => ['team_batch' => $correlationId, 'orchestration_parent' => true],
+            'metadata' => [...$metadata, 'team_batch' => $correlationId, 'orchestration_parent' => true],
         ]);
 
         $slugs = ['analytics-reporting', 'acquisition-growth', 'content-strategy', 'conversion'];
@@ -96,6 +96,7 @@ class AgentTeamService
                 'correlation_id' => $correlationId,
                 'parent_run_id' => $parent->id,
                 'team_batch' => $correlationId,
+                ...$metadata,
             ]);
             $runs->push($run);
             $failed = $failed || $run->status === 'failed';
@@ -112,6 +113,7 @@ class AgentTeamService
                 'correlation_id' => $correlationId,
                 'team_batch' => $correlationId,
                 'orchestration_parent' => true,
+                ...$metadata,
             ], $parent);
             $duration = $this->duration($timer);
             $parent->update(['duration_ms' => $duration]);

@@ -7,6 +7,19 @@
         <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-300">Agents analyze data and create pending recommendations. Campaigns, messages, and website changes require approval and are never executed by this workflow.</p>
     </section>
 
+    <section class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        @foreach([
+            ['Next full-team run', $scheduleSummary['full_team']?->next_run_at?->format('M j, g:i A') ?? 'Not scheduled', 'users-round'],
+            ['Next Analytics run', $scheduleSummary['analytics']?->next_run_at?->format('M j, g:i A') ?? 'Not scheduled', 'chart-no-axes-combined'],
+            ['Next weekly plan', $scheduleSummary['weekly_plan']?->next_run_at?->format('M j, g:i A') ?? 'Not scheduled', 'clipboard-list'],
+            ['Last scheduled status', ucfirst($scheduleSummary['last']?->last_status ?? 'Not run'), 'activity'],
+            ['Latest trigger', $latestTriggerReason ?? 'No event trigger yet', 'zap'],
+        ] as [$label, $value, $icon])
+            <article class="rounded-lg bg-white p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_10px_24px_rgba(5,18,55,0.06)]"><div class="flex items-center gap-2 text-teal"><i data-lucide="{{ $icon }}" class="size-4"></i><p class="text-xs font-bold text-slate-500">{{ $label }}</p></div><p class="mt-2 break-words text-sm font-bold text-navy">{{ $value }}</p></article>
+        @endforeach
+    </section>
+    <div class="mt-3 flex flex-wrap gap-2"><a href="{{ route('agent-schedules.index', ['website_id' => $website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.1)]"><i data-lucide="calendar-clock" class="size-4"></i>Manage schedules</a><a href="{{ route('websites.weekly-marketing-plans.index', $website) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.1)]"><i data-lucide="clipboard-list" class="size-4"></i>Weekly plans</a><form method="POST" action="{{ route('websites.agent-schedules.defaults', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-teal shadow-[0_0_0_1px_rgba(1,101,118,0.2)]"><i data-lucide="calendar-plus" class="size-4"></i>Create missing defaults</button></form></div>
+
     @php
         $runButtons = [
             'acquisition-growth' => ['Run Acquisition Agent', 'trending-up'],
