@@ -20,6 +20,18 @@
     </section>
     <div class="mt-3 flex flex-wrap gap-2"><a href="{{ route('agent-schedules.index', ['website_id' => $website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.1)]"><i data-lucide="calendar-clock" class="size-4"></i>Manage schedules</a><a href="{{ route('websites.weekly-marketing-plans.index', $website) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-navy shadow-[0_0_0_1px_rgba(5,18,55,0.1)]"><i data-lucide="clipboard-list" class="size-4"></i>Weekly plans</a><form method="POST" action="{{ route('websites.agent-schedules.defaults', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-teal shadow-[0_0_0_1px_rgba(1,101,118,0.2)]"><i data-lucide="calendar-plus" class="size-4"></i>Create missing defaults</button></form></div>
 
+    <section class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        @foreach([
+            ['Pending approvals', $operationsSummary['pending_approvals'], 'inbox'],
+            ['Active runs', $operationsSummary['active_runs'], 'loader-circle'],
+            ['Next scheduled run', $operationsSummary['next_schedule']?->format('M j, g:i A') ?? 'None', 'calendar-clock'],
+            ['Latest weekly plan', $operationsSummary['latest_plan'] ? ucfirst($operationsSummary['latest_plan']->status) : 'None', 'clipboard-list'],
+            ['Unresolved handoffs', $operationsSummary['unresolved_handoffs'], 'git-pull-request-arrow'],
+            ['Recent failed run', $operationsSummary['recent_failure']?->agent?->name ?? 'None', 'circle-alert'],
+        ] as [$label,$value,$icon])<article class="rounded-lg border border-slate-200 bg-white p-4"><div class="flex items-center gap-2"><i data-lucide="{{ $icon }}" class="size-4 text-teal"></i><p class="text-xs font-semibold text-slate-500">{{ $label }}</p></div><p class="mt-2 break-words text-sm font-bold text-navy">{{ $value }}</p></article>@endforeach
+    </section>
+    <div class="mt-3 flex flex-wrap gap-2"><a href="{{ route('approvals.index',['website_id'=>$website->id]) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 text-sm font-semibold text-white"><i data-lucide="inbox" class="size-4"></i>Workspace approvals</a><a href="{{ route('agent-operations.index') }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white"><i data-lucide="activity" class="size-4"></i>Agent operations</a></div>
+
     @php
         $runButtons = [
             'acquisition-growth' => ['Run Acquisition Agent', 'trending-up'],

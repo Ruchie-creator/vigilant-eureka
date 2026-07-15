@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WeeklyMarketingPlan extends Model
 {
-    protected $fillable = ['website_id', 'agent_run_id', 'period_start', 'period_end', 'primary_goal', 'status', 'executive_summary', 'performance_summary', 'top_priorities', 'agent_contributions', 'expected_results', 'unresolved_actions', 'approved_at', 'completed_at'];
+    protected $fillable = ['website_id', 'agent_run_id', 'period_start', 'period_end', 'primary_goal', 'status', 'executive_summary', 'performance_summary', 'top_priorities', 'agent_contributions', 'expected_results', 'unresolved_actions', 'approved_at', 'completed_at', 'reviewed_by', 'reviewed_at', 'review_notes', 'revision_requested_at', 'revision_reason'];
 
     protected function casts(): array
     {
-        return ['period_start' => 'date', 'period_end' => 'date', 'performance_summary' => 'array', 'top_priorities' => 'array', 'agent_contributions' => 'array', 'expected_results' => 'array', 'unresolved_actions' => 'array', 'approved_at' => 'datetime', 'completed_at' => 'datetime'];
+        return ['period_start' => 'date', 'period_end' => 'date', 'performance_summary' => 'array', 'top_priorities' => 'array', 'agent_contributions' => 'array', 'expected_results' => 'array', 'unresolved_actions' => 'array', 'approved_at' => 'datetime', 'completed_at' => 'datetime', 'reviewed_at' => 'datetime', 'revision_requested_at' => 'datetime'];
     }
 
     public function website(): BelongsTo { return $this->belongsTo(Website::class); }
     public function agentRun(): BelongsTo { return $this->belongsTo(AgentRun::class); }
+    public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
 }

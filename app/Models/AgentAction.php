@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AgentAction extends Model
 {
-    protected $fillable = ['agent_run_id', 'website_id', 'action_type', 'title', 'description', 'priority', 'status', 'related_page_url', 'related_query', 'expected_result', 'created_task_id', 'metadata'];
+    protected $fillable = ['agent_run_id', 'website_id', 'action_type', 'title', 'description', 'priority', 'status', 'related_page_url', 'related_query', 'expected_result', 'created_task_id', 'original_action_id', 'metadata', 'reviewed_by', 'reviewed_at', 'review_notes', 'revision_requested_at', 'revision_reason'];
 
     protected function casts(): array
     {
-        return ['metadata' => 'array'];
+        return ['metadata' => 'array', 'reviewed_at' => 'datetime', 'revision_requested_at' => 'datetime'];
     }
 
     public function run(): BelongsTo
@@ -28,4 +28,7 @@ class AgentAction extends Model
     {
         return $this->belongsTo(MarketingTask::class, 'created_task_id');
     }
+
+    public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
+    public function originalAction(): BelongsTo { return $this->belongsTo(self::class, 'original_action_id'); }
 }

@@ -81,10 +81,11 @@ abstract class AgentService
                 'approval_required' => (bool) ($action['approval_required'] ?? true),
                 'data_sources' => $action['data_sources'] ?? $goal['data_sources'],
                 'conversion_goal' => $goal['key'],
+                'revision_source' => $runMetadata['revision_source'] ?? null,
                 ...($action['metadata'] ?? []),
             ];
 
-            $createdAction = AgentAction::create([
+            $actionPayload = [
                 'agent_run_id' => $run->id,
                 'website_id' => $website->id,
                 'action_type' => $action['type'],
@@ -96,7 +97,11 @@ abstract class AgentService
                 'related_query' => $action['query'] ?? null,
                 'expected_result' => $action['expected'],
                 'metadata' => $metadata,
-            ]);
+                'original_action_id' => $runMetadata['original_action_id'] ?? null,
+            ];
+            $createdAction = $existingRun && $run->actions()->exists()
+                ? tap($run->actions()->oldest()->first())->update($actionPayload)
+                : AgentAction::create($actionPayload);
 
             foreach ($handoffContext as $handoff) {
                 $record = \App\Models\AgentHandoff::find($handoff['id']);

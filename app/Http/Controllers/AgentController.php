@@ -7,6 +7,8 @@ use App\Models\AgentAction;
 use App\Models\AgentHandoff;
 use App\Models\AgentMemory;
 use App\Models\Website;
+use App\Models\MarketingTask;
+use App\Models\WeeklyMarketingPlan;
 use App\Services\ConversionGoalProfileService;
 use Illuminate\View\View;
 
@@ -37,6 +39,7 @@ class AgentController extends Controller
         $memories = AgentMemory::with('agent')->where('website_id', $website->id)->latest()->limit(8)->get();
         $handoffs = AgentHandoff::with(['fromAgent', 'toAgent'])->where('website_id', $website->id)->latest()->limit(20)->get();
         $schedules = $website->agentSchedules()->with('agent')->get();
+        $latestPlan = $website->weeklyMarketingPlans()->latest('period_start')->first();
 
         return view('agents.website', [
             'website' => $website,
@@ -55,6 +58,14 @@ class AgentController extends Controller
                 'last' => $schedules->sortByDesc('last_run_at')->first(),
             ],
             'latestTriggerReason' => $website->agentRuns()->whereNotNull('metadata')->latest()->get()->first(fn ($run) => filled(data_get($run->metadata, 'trigger_reason')))?->metadata['trigger_reason'] ?? null,
+            'operationsSummary' => [
+                'pending_approvals' => AgentAction::where('website_id', $website->id)->whereIn('status', ['pending', 'reviewed'])->count() + MarketingTask::where('website_id', $website->id)->where('approval_status', 'pending')->count() + WeeklyMarketingPlan::where('website_id', $website->id)->where('status', 'draft')->count(),
+                'active_runs' => $website->agentRuns()->whereIn('status', ['pending', 'running'])->count(),
+                'next_schedule' => $schedules->where('enabled', true)->whereNotNull('next_run_at')->sortBy('next_run_at')->first()?->next_run_at,
+                'latest_plan' => $latestPlan,
+                'unresolved_handoffs' => $handoffs->whereIn('status', ['pending', 'accepted', 'failed'])->count(),
+                'recent_failure' => $website->agentRuns()->with('agent')->where('status', 'failed')->latest()->first(),
+            ],
         ]);
     }
 }

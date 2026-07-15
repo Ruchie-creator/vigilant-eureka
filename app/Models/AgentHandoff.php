@@ -7,15 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AgentHandoff extends Model
 {
-    protected $fillable = ['website_id', 'agent_run_id', 'from_agent_id', 'to_agent_id', 'reason', 'context', 'expected_output', 'status', 'accepted_at', 'completed_at'];
+    protected $fillable = ['website_id', 'agent_run_id', 'from_agent_id', 'to_agent_id', 'reason', 'context', 'expected_output', 'status', 'accepted_at', 'completed_at', 'reviewed_by', 'reviewed_at', 'review_notes', 'revision_requested_at', 'revision_reason'];
 
     protected function casts(): array
     {
-        return ['context' => 'array', 'accepted_at' => 'datetime', 'completed_at' => 'datetime'];
+        return ['context' => 'array', 'accepted_at' => 'datetime', 'completed_at' => 'datetime', 'reviewed_at' => 'datetime', 'revision_requested_at' => 'datetime'];
     }
 
     public function website(): BelongsTo { return $this->belongsTo(Website::class); }
     public function run(): BelongsTo { return $this->belongsTo(AgentRun::class, 'agent_run_id'); }
     public function fromAgent(): BelongsTo { return $this->belongsTo(Agent::class, 'from_agent_id'); }
     public function toAgent(): BelongsTo { return $this->belongsTo(Agent::class, 'to_agent_id'); }
+    public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
 }

@@ -7,6 +7,8 @@ use App\Http\Controllers\AgentRunController;
 use App\Http\Controllers\AgentMemoryController;
 use App\Http\Controllers\AgentHandoffController;
 use App\Http\Controllers\AgentScheduleController;
+use App\Http\Controllers\AgentOperationsController;
+use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConversionEventController;
 use App\Http\Controllers\DashboardController;
@@ -38,6 +40,12 @@ Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')-
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
+    Route::patch('/approvals/{type}/{id}', [ApprovalController::class, 'update'])->name('approvals.update');
+    Route::get('/agent-operations', [AgentOperationsController::class, 'index'])->name('agent-operations.index');
+    Route::get('/agent-operations/runs/{agentRun}', [AgentOperationsController::class, 'show'])->name('agent-operations.runs.show');
+    Route::post('/agent-operations/runs/{agentRun}/retry', [AgentOperationsController::class, 'retry'])->name('agent-operations.runs.retry');
+    Route::patch('/agent-operations/runs/{agentRun}/cancel', [AgentOperationsController::class, 'cancel'])->name('agent-operations.runs.cancel');
 
     Route::get('/agents', [AgentController::class, 'index'])->name('agents.index');
     Route::get('/agents/{agent}', [AgentController::class, 'show'])->name('agents.show');
