@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use App\Models\AgentAction;
 use App\Models\GoogleAccount;
 use App\Models\GscSync;
 use App\Services\SafeUrl;
 use App\Services\GrowthOpportunityGenerator;
 use App\Services\SearchConsolePropertyMatcher;
+use App\Services\ConversionGoalProfileService;
+use App\Services\ConversionCheckService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,28 +20,31 @@ use Illuminate\View\View;
 
 class WebsiteController extends Controller
 {
-    public function index(): View
+    public function index(ConversionGoalProfileService $goalProfiles): View
     {
+        $websites = Website::withCount(['seoAudits', 'aiInsights', 'marketingTasks'])->latest()->paginate(12);
+        $websites->getCollection()->each(fn (Website $website) => $website->setAttribute('goal_profile', $goalProfiles->forWebsite($website)));
+
         return view('websites.index', [
-            'websites' => Website::withCount(['seoAudits', 'aiInsights', 'marketingTasks'])->latest()->paginate(12),
+            'websites' => $websites,
         ]);
     }
 
-    public function create(): View
+    public function create(ConversionGoalProfileService $goalProfiles): View
     {
-        return view('websites.form', ['website' => new Website()]);
+        return view('websites.form', ['website' => new Website(), 'goalProfiles' => $goalProfiles->profiles()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ConversionGoalProfileService $goalProfiles): RedirectResponse
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, $goalProfiles);
         SafeUrl::assertPublicHttpUrl($data['url']);
         Website::create($data);
 
-        return redirect()->route('websites.index')->with('success', 'Website added.');
+        return redirect()->route('websites.index')->with('success', 'Workspace added.');
     }
 
-    public function show(Request $request, Website $website, GrowthOpportunityGenerator $classifier): View
+    public function show(Request $request, Website $website, GrowthOpportunityGenerator $classifier, ConversionGoalProfileService $goalProfiles): View
     {
         $hasGscTables = Schema::hasTable('gsc_daily_metrics') && Schema::hasTable('gsc_queries') && Schema::hasTable('gsc_pages') && Schema::hasTable('gsc_devices');
         $hasGrowth = Schema::hasTable('growth_opportunities');
@@ -47,6 +53,7 @@ class WebsiteController extends Controller
         $hasGscSyncs = Schema::hasTable('gsc_syncs');
         $hasGscCountries = Schema::hasTable('gsc_countries');
         $hasConversionChecks = Schema::hasTable('conversion_checks');
+        $hasConversionEvents = Schema::hasTable('conversion_events');
 
         $filters = [
             'date_start' => $request->query('date_start'),
@@ -61,6 +68,7 @@ class WebsiteController extends Controller
             'status' => $request->query('status'),
         ];
         $opportunityStatus = $filters['status'] ?: 'open';
+        $goalProfile = $goalProfiles->forWebsite($website);
 
         $mobileClicks = $hasGscTables ? (int) $website->gscDevices()->where('device', 'mobile')->latest()->value('clicks') : 0;
         $topPriority = $hasGrowth
@@ -69,6 +77,7 @@ class WebsiteController extends Controller
                 ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['acquisition_growth', 'service_page_growth', 'conversion_improvement']))
                 ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
                 ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
+                ->when($hasConversionEvents, fn ($query) => $query->withCount('conversionEvents')->withMax('conversionEvents', 'occurred_at'))
                 ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
                 ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
                 ->first()
@@ -77,7 +86,7 @@ class WebsiteController extends Controller
         $relations = [
             'searchConsoleSite',
             'seoAudits' => fn ($query) => $query->latest()->limit(8),
-            'aiInsights' => fn ($query) => $query->whereIn('status', ['new', 'reviewed'])->latest()->limit(5),
+            'aiInsights' => fn ($query) => $query->whereIn('status', ['new', 'reviewed'])->whereNotNull('insight_key')->latest()->limit(3),
             'marketingTasks' => fn ($query) => $query->latest()->limit(8),
         ];
 
@@ -89,17 +98,6 @@ class WebsiteController extends Controller
             $relations['gscQueries'] = fn ($query) => $query->orderByDesc('impressions')->limit(5);
             $relations['gscPages'] = fn ($query) => $query->orderByDesc('impressions')->limit(5);
             $relations['gscDevices'] = fn ($query) => $query->latest()->limit(10);
-        }
-
-        if ($hasGrowth) {
-            $relations['growthOpportunities'] = fn ($query) => $query
-                ->where('status', $opportunityStatus)
-                ->when($hasGrowthCategory, fn ($query) => $query->whereNotIn('opportunity_category', ['branded_visibility', 'reputation_conversion', 'low_value']))
-                ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
-                ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
-                ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
-                ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
-                ->limit(5);
         }
 
         if ($hasConversionChecks) {
@@ -117,24 +115,26 @@ class WebsiteController extends Controller
             ? ! SearchConsolePropertyMatcher::matches($website->url, $website->searchConsoleSite->site_url)
             : false;
 
-        $serviceOpportunities = $hasGrowth ? $website->growthOpportunities()
+        $displayOpportunities = $hasGrowth ? $website->growthOpportunities()
             ->where('status', $opportunityStatus)
-            ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['acquisition_growth', 'service_page_growth']))
+            ->when($hasGrowthCategory, fn ($query) => $query->where(fn ($categoryQuery) => $categoryQuery
+                ->whereNull('opportunity_category')
+                ->orWhere('opportunity_category', '!=', 'low_value')))
             ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
             ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
+            ->when($hasConversionEvents, fn ($query) => $query->withCount('conversionEvents')->withMax('conversionEvents', 'occurred_at'))
             ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
             ->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))
             ->limit(5)
             ->get() : collect();
 
-        $brandedOpportunities = $hasGrowth ? $website->growthOpportunities()
-            ->where('status', $opportunityStatus)
-            ->when($hasGrowthCategory, fn ($query) => $query->whereIn('opportunity_category', ['branded_visibility', 'reputation_conversion']))
-            ->when(filled($filters['opportunity_category']) && $hasGrowthCategory, fn ($query) => $query->where('opportunity_category', $filters['opportunity_category']))
-            ->when(filled($filters['opportunity_priority']), fn ($query) => $query->where('priority', $filters['opportunity_priority']))
-            ->orderByDesc('impressions')
-            ->limit(5)
-            ->get() : collect();
+        $serviceCategories = ['acquisition_growth', 'service_page_growth'];
+        $brandedCategories = ['branded_visibility', 'reputation_conversion'];
+        $serviceOpportunities = $displayOpportunities->whereIn('opportunity_category', $serviceCategories)->values();
+        $brandedOpportunities = $displayOpportunities->whereIn('opportunity_category', $brandedCategories)->values();
+        $otherOpportunities = $displayOpportunities
+            ->whereNotIn('opportunity_category', [...$serviceCategories, ...$brandedCategories])
+            ->values();
 
         $queries = $hasGscTables ? $website->gscQueries()
             ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
@@ -210,6 +210,9 @@ class WebsiteController extends Controller
             ->orderBy('date')
             ->get(['date', 'clicks', 'impressions', 'ctr', 'position']) : collect();
 
+        $dataDateStart = $latestSync?->date_start ?? $trendRows->first()?->date;
+        $dataDateEnd = $latestSync?->date_end ?? $trendRows->last()?->date;
+
         $deviceRows = $hasGscTables ? $website->gscDevices()
             ->when($latestSync, fn ($query) => $query->where('date_start', $latestSync->date_start->toDateString())->where('date_end', $latestSync->date_end->toDateString()))
             ->selectRaw('device, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(ctr) as ctr, AVG(position) as position')
@@ -267,7 +270,7 @@ class WebsiteController extends Controller
                 'ctr' => (float) $row->ctr,
                 'position' => (float) $row->position,
                 'is_target' => $this->isTargetCountry((string) $row->country, $targetCountryCodes),
-                'recommendation' => $this->countryRecommendation((string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
+                'recommendation' => $this->countryRecommendation($website, (string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
             ]);
 
         $deviceMetrics = $deviceRows->take(5)->map(fn ($row) => [
@@ -276,7 +279,7 @@ class WebsiteController extends Controller
             'impressions' => (int) $row->impressions,
             'ctr' => (float) $row->ctr,
             'position' => (float) $row->position,
-            'recommendation' => $this->deviceRecommendation((string) $row->device, (float) $row->ctr, (float) $row->position),
+            'recommendation' => $this->deviceRecommendation($website, (string) $row->device, (float) $row->ctr, (float) $row->position),
         ]);
 
         $pageRecommendations = $pageRows->map(fn ($page) => [
@@ -297,9 +300,34 @@ class WebsiteController extends Controller
                 'intent' => $intent,
                 'category' => $classifier->opportunityCategoryForIntent($intent),
                 'related_page' => $relatedPage?->page_url,
-                'recommendation' => $this->queryRecommendationForDisplay($intent, $relatedPage?->page_url),
+                'recommendation' => $this->queryRecommendationForDisplay($website, $intent, $relatedPage?->page_url),
             ];
         });
+
+        $conversionEventSummary = [
+            'total' => 0,
+            'attributed' => 0,
+            'last_event_at' => null,
+            'script_url' => $website->tracking_key ? route('conversion-tracking.script', $website->tracking_key) : null,
+            'install_tag' => $website->tracking_key ? '<script async src="'.route('conversion-tracking.script', $website->tracking_key).'"></script>' : null,
+            'is_local' => str_contains((string) config('app.url'), 'localhost') || str_contains((string) config('app.url'), '127.0.0.1'),
+            'example_opportunity_id' => $topPriority?->id,
+            'event_labels' => $goalProfile['conversion_labels'],
+        ];
+
+        if ($hasConversionEvents) {
+            $recentEvents = $website->conversionEvents()->where('occurred_at', '>=', now()->subDays(30));
+            $conversionEventSummary['total'] = (clone $recentEvents)->count();
+            $conversionEventSummary['attributed'] = (clone $recentEvents)->whereNotNull('growth_opportunity_id')->count();
+            $conversionEventSummary['last_event_at'] = $website->conversionEvents()->latest('occurred_at')->first()?->occurred_at;
+        }
+
+        $latestTeamActions = AgentAction::with(['run.agent', 'createdTask'])
+            ->where('website_id', $website->id)
+            ->latest()
+            ->get()
+            ->unique(fn ($action) => $action->run->agent->slug)
+            ->keyBy(fn ($action) => $action->run->agent->slug);
 
         return view('websites.show', [
             'website' => $website,
@@ -320,10 +348,13 @@ class WebsiteController extends Controller
             'servicePageClicks' => (int) $servicePageClicks,
             'brandedClicks' => (int) $brandedClicks,
             'targetCountry' => $targetCountry,
+            'targetLocation' => $this->targetLocationLabel($website),
+            'dataDateStart' => $dataDateStart,
+            'dataDateEnd' => $dataDateEnd,
             'countryMetrics' => $countryMetrics,
             'deviceMetrics' => $deviceMetrics,
             'chartData' => $chartData,
-            'openConversionOpportunities' => $hasGrowth ? $website->growthOpportunities()->where('status', 'open')->whereIn('opportunity_type', ['improve_booking_cta', 'mobile_conversion', 'increase_ctr_and_conversion'])->count() : 0,
+            'openConversionOpportunities' => $hasGrowth ? $website->growthOpportunities()->where('status', 'open')->where('opportunity_category', 'conversion_improvement')->count() : 0,
             'topPriority' => $topPriority,
             'pageRecommendations' => $pageRecommendations,
             'filteredQueries' => $queries,
@@ -331,6 +362,10 @@ class WebsiteController extends Controller
             'queryIntents' => $queryIntents,
             'serviceOpportunities' => $serviceOpportunities,
             'brandedOpportunities' => $brandedOpportunities,
+            'otherOpportunities' => $otherOpportunities,
+            'conversionEventSummary' => $conversionEventSummary,
+            'goalProfile' => $goalProfile,
+            'latestTeamActions' => $latestTeamActions,
         ]);
     }
 
@@ -370,6 +405,24 @@ class WebsiteController extends Controller
         };
     }
 
+    private function targetLocationLabel(Website $website): string
+    {
+        $locations = collect($website->serviceProfile()['target_locations'] ?? [])
+            ->push($website->target_location)
+            ->filter()
+            ->map(fn ($location) => strtolower((string) $location));
+
+        if ($locations->contains(fn ($location) => str_contains($location, 'geneve') || str_contains($location, 'geneva') || str_contains($location, 'suisse') || str_contains($location, 'switzerland'))) {
+            return 'Geneva / Switzerland';
+        }
+
+        if ($locations->contains(fn ($location) => str_contains($location, 'lyon') || str_contains($location, 'france'))) {
+            return 'Lyon / France';
+        }
+
+        return $website->target_location ?: 'Not set';
+    }
+
     private function isTargetCountry(string $country, array $targetCountryCodes): bool
     {
         $country = strtolower($country);
@@ -377,59 +430,70 @@ class WebsiteController extends Controller
         return in_array($country, $targetCountryCodes, true);
     }
 
-    private function countryRecommendation(string $country, bool $isTarget, int $clicks): string
+    private function countryRecommendation(Website $website, string $country, bool $isTarget, int $clicks): string
     {
+        $goal = app(ConversionGoalProfileService::class)->forWebsite($website);
+
         if ($isTarget) {
             return $clicks > 0
-                ? 'Protect target-country visibility and connect service pages to appointment CTAs.'
-                : 'Improve target-country relevance on service pages and local trust signals.';
+                ? 'Protect target-market visibility and connect priority pages to '.$goal['primary_action_label'].'.'
+                : 'Improve target-market relevance on priority pages and strengthen the '.$goal['journey_label'].'.';
         }
 
-        return 'Review whether this country is useful; avoid letting non-target traffic distract from appointment growth.';
+        return 'Review whether this country supports the configured audience; avoid letting non-target traffic distract from '.$goal['primary_action_label'].'.';
     }
 
-    private function deviceRecommendation(string $device, float $ctr, float $position): string
+    private function deviceRecommendation(Website $website, string $device, float $ctr, float $position): string
     {
         $device = strtolower($device);
+        $goal = app(ConversionGoalProfileService::class)->forWebsite($website);
 
         if ($device === 'mobile') {
-            return 'Prioritize fast mobile booking CTAs, tap-to-call, and short service-page intros.';
+            return 'Prioritize a fast mobile '.$goal['cta_label'].' and a short, low-friction '.$goal['journey_label'].'.';
         }
 
         if ($ctr < 2 && $position <= 12) {
-            return 'Improve titles/meta and ensure the appointment path is visible above the fold.';
+            return 'Improve titles/meta and ensure the '.$goal['journey_label'].' is visible above the fold.';
         }
 
-        return 'Keep the conversion path clear and verify booking interactions are tracked.';
+        return 'Keep the conversion path clear and verify configured conversion events are tracked.';
     }
 
-    private function queryRecommendationForDisplay(string $intent, ?string $relatedPage): string
+    private function queryRecommendationForDisplay(Website $website, string $intent, ?string $relatedPage): string
     {
+        $goal = app(ConversionGoalProfileService::class)->forWebsite($website);
+
         if (in_array($intent, ['branded_practitioner', 'review_reputation'], true)) {
-            return 'Strengthen trust, credentials, review visibility, and the appointment CTA on the About/practitioner path.';
+            return 'Strengthen trust, credentials, review visibility, and the '.$goal['cta_label'].' on the brand or representative path.';
         }
 
         if (in_array($intent, ['service_intent', 'local_service_intent', 'condition_intent'], true)) {
             return $relatedPage
-                ? 'Improve the related service page title/meta, patient-intent copy, internal links, and booking CTA.'
-                : 'Map this query to a relevant service page and add a clear appointment path.';
+                ? 'Improve the related priority page title/meta, audience-intent copy, internal links, and '.$goal['cta_label'].'.'
+                : 'Map this query to a relevant priority page and add a clear '.$goal['journey_label'].'.';
         }
 
         return 'Review intent fit before prioritizing; do not let low-value searches dominate growth work.';
     }
 
-    public function edit(Website $website): View
+    public function edit(Website $website, ConversionGoalProfileService $goalProfiles): View
     {
-        return view('websites.form', compact('website'));
+        return view('websites.form', ['website' => $website, 'goalProfiles' => $goalProfiles->profiles()]);
     }
 
-    public function update(Request $request, Website $website): RedirectResponse
+    public function update(Request $request, Website $website, ConversionGoalProfileService $goalProfiles, ConversionCheckService $conversionChecks): RedirectResponse
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, $goalProfiles);
         SafeUrl::assertPublicHttpUrl($data['url']);
+        $goalChanged = $website->primary_conversion_goal !== $data['primary_conversion_goal'];
         $website->update($data);
 
-        return redirect()->route('websites.show', $website)->with('success', 'Website updated.');
+        if ($goalChanged) {
+            $website->conversionChecks()->delete();
+            $conversionChecks->ensureDefaults($website);
+        }
+
+        return redirect()->route('websites.show', $website)->with('success', 'Workspace updated.');
     }
 
     public function gscQueries(Website $website, GrowthOpportunityGenerator $classifier): View
@@ -445,7 +509,7 @@ class WebsiteController extends Controller
                 'intent' => $intent,
                 'category' => $classifier->opportunityCategoryForIntent($intent),
                 'related_page' => $relatedPage?->page_url,
-                'recommendation' => $this->queryRecommendationForDisplay($intent, $relatedPage?->page_url),
+                'recommendation' => $this->queryRecommendationForDisplay($website, $intent, $relatedPage?->page_url),
             ];
         });
 
@@ -484,7 +548,7 @@ class WebsiteController extends Controller
             'ctr' => (float) $row->ctr,
             'position' => (float) $row->position,
             'is_target' => $this->isTargetCountry((string) $row->country, $targetCountryCodes),
-            'recommendation' => $this->countryRecommendation((string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
+            'recommendation' => $this->countryRecommendation($website, (string) $row->country, $this->isTargetCountry((string) $row->country, $targetCountryCodes), (int) $row->clicks),
         ]);
 
         return view('websites.gsc-countries-index', compact('website', 'countries', 'countryMetrics', 'targetCountry'));
@@ -502,13 +566,13 @@ class WebsiteController extends Controller
             'impressions' => (int) $row->impressions,
             'ctr' => (float) $row->ctr,
             'position' => (float) $row->position,
-            'recommendation' => $this->deviceRecommendation((string) $row->device, (float) $row->ctr, (float) $row->position),
+            'recommendation' => $this->deviceRecommendation($website, (string) $row->device, (float) $row->ctr, (float) $row->position),
         ]);
 
         return view('websites.gsc-devices-index', compact('website', 'devices', 'deviceMetrics'));
     }
 
-    public function growthOpportunities(Request $request, Website $website): View
+    public function growthOpportunities(Request $request, Website $website, ConversionGoalProfileService $goalProfiles): View
     {
         $filters = [
             'priority' => $request->query('priority'),
@@ -533,11 +597,13 @@ class WebsiteController extends Controller
                             ->orWhere('related_page_url', 'like', $term);
                     });
                 })
+                ->when(Schema::hasTable('conversion_events'), fn ($query) => $query->withCount('conversionEvents')->withMax('conversionEvents', 'occurred_at'))
                 ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')")
                 ->orderByDesc('score')
                 ->paginate(25)
                 ->withQueryString(),
             'filters' => $filters,
+            'goalProfile' => $goalProfiles->forWebsite($website),
         ]);
     }
 
@@ -548,12 +614,12 @@ class WebsiteController extends Controller
         return redirect()->route('websites.index')->with('success', 'Website deleted.');
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, ConversionGoalProfileService $goalProfiles): array
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'url' => ['required', 'url:http,https', 'max:2048'],
-            'type' => ['required', Rule::in(['osteopathy', 'auriculotherapy', 'sexology', 'other'])],
+            'type' => ['required', Rule::in(['professional_services', 'saas', 'ecommerce', 'osteopathy', 'auriculotherapy', 'sexology', 'other'])],
             'language' => ['required', 'string', 'max:40'],
             'target_location' => ['nullable', 'string', 'max:255'],
             'primary_services' => ['nullable', 'string', 'max:5000'],
@@ -562,12 +628,21 @@ class WebsiteController extends Controller
             'brand_terms' => ['nullable', 'string', 'max:5000'],
             'priority_pages' => ['nullable', 'string', 'max:10000'],
             'status' => ['required', Rule::in(['active', 'paused', 'archived'])],
+            'primary_conversion_goal' => ['required', Rule::in(array_keys($goalProfiles->profiles()))],
+            'secondary_conversion_goals' => ['nullable', 'string', 'max:5000'],
+            'target_audience' => ['nullable', 'string', 'max:2000'],
+            'business_model' => ['nullable', 'string', 'max:255'],
+            'conversion_labels' => ['nullable', 'string', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         foreach (['primary_services', 'target_locations', 'practitioner_names', 'brand_terms', 'priority_pages'] as $field) {
             $data[$field] = $this->parseList($data[$field] ?? '');
         }
+
+        $data['secondary_conversion_goals'] = $this->parseList($data['secondary_conversion_goals'] ?? '');
+        $data['conversion_labels'] = $this->parseLabels($data['conversion_labels'] ?? '');
+        $data['conversion_labels'] = $data['conversion_labels'] ?: $goalProfiles->labelsFor($data['primary_conversion_goal']);
 
         return $data;
     }
@@ -579,6 +654,15 @@ class WebsiteController extends Controller
             ->filter()
             ->unique()
             ->values()
+            ->all();
+    }
+
+    private function parseLabels(?string $value): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', (string) $value))
+            ->map(fn ($line) => array_map('trim', explode('=', $line, 2)))
+            ->filter(fn ($parts) => count($parts) === 2 && preg_match('/\A[a-z0-9_-]+\z/i', $parts[0]) && filled($parts[1]))
+            ->mapWithKeys(fn ($parts) => [strtolower($parts[0]) => $parts[1]])
             ->all();
     }
 }

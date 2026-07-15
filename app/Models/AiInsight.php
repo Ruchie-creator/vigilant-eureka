@@ -13,13 +13,28 @@ class AiInsight extends Model
         'audit_id',
         'title',
         'summary',
+        'why_it_matters',
         'priority',
         'category',
         'recommendation',
         'expected_result',
+        'suggested_task',
+        'data_used',
         'status',
         'source',
+        'insight_key',
+        'data_period',
+        'property_url',
+        'affected_source_type',
+        'affected_source_value',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'data_used' => 'array',
+        ];
+    }
 
     public function website(): BelongsTo
     {

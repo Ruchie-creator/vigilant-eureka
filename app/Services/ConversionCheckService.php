@@ -7,9 +7,13 @@ use App\Models\Website;
 
 class ConversionCheckService
 {
+    public function __construct(private readonly ConversionGoalProfileService $goalProfiles)
+    {
+    }
+
     public function ensureDefaults(Website $website): void
     {
-        foreach ($this->defaults() as $check) {
+        foreach ($this->defaults($website) as $check) {
             $check['check_hash'] = hash('sha256', ($check['page_url'] ?? '').'|'.$check['item']);
             ConversionCheck::firstOrCreate(
                 ['website_id' => $website->id, 'check_hash' => $check['check_hash']],
@@ -18,8 +22,27 @@ class ConversionCheckService
         }
     }
 
-    private function defaults(): array
+    private function defaults(Website $website): array
     {
+        $goal = $this->goalProfiles->forWebsite($website);
+
+        if ($goal['key'] !== 'appointment_booking') {
+            $checks = [
+                ['item' => $goal['primary_action_label'].' CTA visible on priority pages', 'priority' => 'high', 'status' => 'missing', 'recommendation' => 'Add a clear '.$goal['cta_label'].' to the pages with the strongest qualified traffic.'],
+                ['item' => $goal['primary_action_label'].' event tracked', 'priority' => 'high', 'status' => 'missing', 'recommendation' => 'Track '.$goal['conversion_labels'][$goal['primary_action']].' as the primary conversion event.'],
+                ['item' => 'Primary conversion path reviewed on mobile', 'priority' => 'high', 'status' => 'missing', 'recommendation' => 'Review the mobile '.$goal['journey_label'].' for clarity, speed, and unnecessary steps.'],
+                ['item' => 'Priority landing pages reviewed for conversion', 'priority' => 'medium', 'status' => 'missing', 'recommendation' => 'Review high-intent landing pages against the configured audience and primary action.'],
+                ['item' => 'Connected evidence sources verified', 'priority' => 'medium', 'status' => 'missing', 'recommendation' => 'Verify that the connected sources can measure the primary and supporting conversion goals.'],
+            ];
+
+            foreach ($goal['secondary_conversion_goals'] as $eventKey) {
+                $label = $goal['conversion_labels'][$eventKey] ?? str_replace('_', ' ', $eventKey);
+                $checks[] = ['item' => $label.' tracked', 'priority' => 'medium', 'status' => 'missing', 'recommendation' => 'Track '.$label.' as a supporting conversion event.'];
+            }
+
+            return $checks;
+        }
+
         return [
             ['item' => 'Booking CTA visible above the fold on mobile', 'priority' => 'high', 'status' => 'missing', 'recommendation' => 'Add a clear appointment CTA in the first mobile viewport.'],
             ['item' => 'Sticky mobile booking button', 'priority' => 'high', 'status' => 'missing', 'recommendation' => 'Add a sticky appointment button for mobile visitors.'],

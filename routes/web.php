@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Controllers\AiInsightController;
+use App\Http\Controllers\AgentActionController;
+use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AgentRunController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\ConversionEventController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoogleSearchConsoleController;
 use App\Http\Controllers\GrowthOpportunityController;
@@ -13,6 +17,13 @@ use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WeeklyReportController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/track/conversions/{trackingKey}/tracker.js', [ConversionEventController::class, 'script'])
+    ->middleware('throttle:120,1')
+    ->name('conversion-tracking.script');
+Route::post('/track/conversions/{trackingKey}', [ConversionEventController::class, 'store'])
+    ->middleware('throttle:120,1')
+    ->name('conversion-events.store');
+
 Route::middleware('guest')->group(function () {
     Route::get('/', fn () => redirect()->route('login'));
     Route::get('/login', [LoginController::class, 'create'])->name('login');
@@ -23,6 +34,14 @@ Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')-
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('/agents', [AgentController::class, 'index'])->name('agents.index');
+    Route::get('/agents/{agent}', [AgentController::class, 'show'])->name('agents.show');
+    Route::post('/agents/{agent}/run', [AgentRunController::class, 'store'])->name('agents.run');
+    Route::get('/websites/{website}/agents', [AgentController::class, 'website'])->name('websites.agents.index');
+    Route::post('/websites/{website}/agents/run-full-team', [AgentRunController::class, 'fullTeam'])->name('websites.agents.run-full-team');
+    Route::patch('/agent-actions/{agentAction}', [AgentActionController::class, 'update'])->name('agent-actions.update');
+    Route::post('/agent-actions/{agentAction}/tasks', [AgentActionController::class, 'storeTask'])->name('agent-actions.tasks.store');
 
     Route::resource('websites', WebsiteController::class);
     Route::get('/websites/{website}/gsc-queries', [WebsiteController::class, 'gscQueries'])->name('websites.gsc-queries.index');
@@ -44,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/seo-audits', [SeoAuditController::class, 'index'])->name('seo-audits.index');
 
     Route::get('/ai-insights', [AiInsightController::class, 'index'])->name('ai-insights.index');
+    Route::get('/websites/{website}/ai-insights', [AiInsightController::class, 'websiteIndex'])->name('websites.ai-insights.index');
     Route::post('/websites/{website}/ai-insights', [AiInsightController::class, 'store'])->name('websites.ai-insights.store');
     Route::patch('/ai-insights/{aiInsight}', [AiInsightController::class, 'update'])->name('ai-insights.update');
     Route::post('/ai-insights/{aiInsight}/tasks', [MarketingTaskController::class, 'storeFromInsight'])->name('ai-insights.tasks.store');

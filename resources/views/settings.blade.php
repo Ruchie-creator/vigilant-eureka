@@ -29,7 +29,7 @@
             <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <label class="grid gap-2 text-sm font-semibold md:col-span-2">
                     API Key
-                    <input name="openai_api_key" type="password" placeholder="{{ $settings['openai']['api_key_masked'] }} - leave blank to keep current key" class="rounded-lg border border-slate-300 px-3 py-2 font-normal">
+                    <input name="openai_api_key" type="password" autocomplete="new-password" placeholder="{{ $settings['openai']['has_api_key'] ? 'Configured - leave blank to keep current key' : 'Enter API key' }}" class="min-h-10 rounded-lg border border-slate-300 px-3 py-2 font-normal">
                 </label>
                 <label class="grid gap-2 text-sm font-semibold">
                     Model
@@ -57,14 +57,14 @@
                 </label>
                 <label class="grid gap-2 text-sm font-semibold">
                     Client Secret
-                    <input name="google_client_secret" type="password" placeholder="{{ $settings['google']['client_secret_masked'] }} - leave blank to keep current secret" class="rounded-lg border border-slate-300 px-3 py-2 font-normal">
+                    <input name="google_client_secret" type="password" autocomplete="new-password" placeholder="{{ $settings['google']['has_client_secret'] ? 'Configured - leave blank to keep current secret' : 'Enter client secret' }}" class="min-h-10 rounded-lg border border-slate-300 px-3 py-2 font-normal">
                 </label>
                 <label class="grid gap-2 text-sm font-semibold md:col-span-2">
                     Redirect URI
                     <input name="google_redirect_uri" value="{{ old('google_redirect_uri', $settings['google']['redirect_uri']) }}" class="rounded-lg border border-slate-300 px-3 py-2 font-normal">
                 </label>
                 <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 md:col-span-2">
-                    Scope: <span class="font-semibold text-navy">{{ $settings['google']['scope'] }}</span>
+                    Scope: <span class="break-all font-semibold text-navy">{{ $settings['google']['scope'] }}</span>
                 </div>
             </div>
             <div class="mt-5 flex flex-wrap gap-2">
@@ -111,7 +111,7 @@
                 </label>
                 <label class="grid gap-2 text-sm font-semibold">
                     Password
-                    <input name="mail_password" type="password" placeholder="{{ $settings['mail']['password_masked'] }} - leave blank to keep current password" class="rounded-lg border border-slate-300 px-3 py-2 font-normal">
+                    <input name="mail_password" type="password" autocomplete="new-password" placeholder="{{ $settings['mail']['has_password'] ? 'Configured - leave blank to keep current password' : 'Enter mail password' }}" class="min-h-10 rounded-lg border border-slate-300 px-3 py-2 font-normal">
                 </label>
                 <label class="grid gap-2 text-sm font-semibold">
                     From Address
@@ -129,7 +129,7 @@
             <div class="mt-4 grid gap-4 text-sm leading-6 text-slate-700">
                 <p>Point the clint-rono.dev domain or subdomain document root to the Laravel <span class="font-semibold">public</span> directory.</p>
                 <p>Keep production secrets in <span class="font-semibold">.env</span>. This page updates those values for the private admin only.</p>
-                <p>Only readonly Google Search Console data is synced. Patient medical data must not be collected or processed.</p>
+                <p>Only read-only Google Search Console performance data is synced. Sensitive personal or medical data must not be collected or processed.</p>
             </div>
         </section>
 

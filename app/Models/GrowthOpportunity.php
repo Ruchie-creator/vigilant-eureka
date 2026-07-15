@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GrowthOpportunity extends Model
 {
@@ -40,5 +41,10 @@ class GrowthOpportunity extends Model
     public function website(): BelongsTo
     {
         return $this->belongsTo(Website::class);
+    }
+
+    public function conversionEvents(): HasMany
+    {
+        return $this->hasMany(ConversionEvent::class);
     }
 }

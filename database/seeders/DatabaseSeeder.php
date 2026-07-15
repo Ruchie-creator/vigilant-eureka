@@ -17,5 +17,7 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make(env('ADMIN_PASSWORD', 'ChangeThisPassword123!')),
             ]
         );
+
+        $this->call(AgentSeeder::class);
     }
 }

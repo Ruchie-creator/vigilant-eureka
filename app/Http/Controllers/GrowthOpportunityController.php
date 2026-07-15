@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\GrowthOpportunity;
 use App\Models\MarketingTask;
+use App\Services\ConversionGoalProfileService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class GrowthOpportunityController extends Controller
 {
+    public function __construct(private readonly ConversionGoalProfileService $goalProfiles)
+    {
+    }
+
     public function storeTask(GrowthOpportunity $growthOpportunity): RedirectResponse
     {
         MarketingTask::firstOrCreate(
@@ -46,11 +51,13 @@ class GrowthOpportunityController extends Controller
 
     private function taskTitle(GrowthOpportunity $opportunity): string
     {
+        $goal = $this->goalProfiles->forWebsite($opportunity->website);
+
         return match ($opportunity->opportunity_type) {
             'increase_ctr', 'increase_ctr_and_conversion' => 'Rewrite title/meta for '.$this->shortSource($opportunity),
-            'mobile_conversion' => 'Add sticky booking CTA on mobile',
+            'mobile_conversion' => 'Improve mobile '.$goal['cta_label'],
             'improve_position' => 'Improve internal links and content for '.$this->shortSource($opportunity),
-            'improve_booking_cta' => 'Improve booking CTA on '.$this->shortSource($opportunity),
+            'improve_booking_cta' => 'Improve '.$goal['cta_label'].' on '.$this->shortSource($opportunity),
             default => 'Improve growth opportunity: '.$this->shortSource($opportunity),
         };
     }

@@ -13,9 +13,14 @@ use Illuminate\Support\Str;
 
 class GrowthOpportunityGenerator
 {
+    public function __construct(private readonly ConversionGoalProfileService $goalProfiles)
+    {
+    }
+
     public function generate(Website $website, CarbonInterface $start, CarbonInterface $end): int
     {
         $created = 0;
+        $goal = $this->goalProfiles->forWebsite($website);
         $pages = GscPage::where('website_id', $website->id)
             ->where('date_start', $start->toDateString())
             ->where('date_end', $end->toDateString())
@@ -35,13 +40,13 @@ class GrowthOpportunityGenerator
                 'source_value' => $priorityPageUrl,
                 'opportunity_type' => 'priority_service_page',
                 'opportunity_category' => 'service_page_growth',
-                'problem' => 'This priority service page represents an offered service but is not prominent in the synced Search Console page data.',
-                'recommendation' => 'Strengthen internal links from the homepage and about page to this service page, then make the appointment CTA clear near the top.',
-                'expected_result' => 'More patients can discover the relevant service path and move toward an appointment action.',
+                'problem' => 'This priority landing page represents an important offer but is not prominent in the synced Search Console page data.',
+                'recommendation' => 'Strengthen internal links to this priority page, then make the '.$goal['cta_label'].' clear near the top.',
+                'expected_result' => 'More '.$goal['audience_label'].' can discover the relevant offer and move toward '.$goal['primary_action_label'].'.',
                 'priority' => 'high',
                 'intent' => 'service_intent',
                 'related_page_url' => $priorityPageUrl,
-                'conversion_action' => 'Add stronger internal links and a visible appointment CTA on the service journey.',
+                'conversion_action' => 'Add stronger internal links and a visible '.$goal['cta_label'].' on the '.$goal['journey_label'].'.',
                 'score' => 72,
             ], $this->virtualMetric($start, $end));
         }
@@ -55,12 +60,12 @@ class GrowthOpportunityGenerator
                 'source_value' => 'mobile',
                 'opportunity_type' => 'mobile_conversion',
                 'opportunity_category' => 'conversion_improvement',
-                'problem' => 'Mobile search performance is strong, so the mobile appointment path matters most.',
-                'recommendation' => 'Prioritize the mobile booking experience: sticky appointment button, tap-to-call, shorter intro, and a clear appointment section.',
-                'expected_result' => 'More appointment actions from mobile visitors.',
+                'problem' => 'Mobile search performance is strong, so the mobile '.$goal['journey_label'].' matters most.',
+                'recommendation' => 'Prioritize the mobile conversion experience with a visible '.$goal['cta_label'].', short value proposition, and low-friction next step.',
+                'expected_result' => 'More mobile visitors can move toward '.$goal['primary_action_label'].'.',
                 'priority' => 'high',
                 'intent' => 'local_service_intent',
-                'conversion_action' => 'Improve mobile booking CTA and tap-to-call path.',
+                'conversion_action' => 'Improve the mobile '.$goal['cta_label'].' and supporting conversion path.',
                 'score' => $this->score($mobile, 'device', 'local_service_intent', null, true),
             ], $mobile);
         }
@@ -71,6 +76,7 @@ class GrowthOpportunityGenerator
     private function queryRules(Website $website, GscQuery $query, Collection $pages): int
     {
         $created = 0;
+        $goal = $this->goalProfiles->forWebsite($website);
         $intent = $this->classifyQueryIntent($query->query, $website);
         $relatedPage = $this->mapQueryToPage($query->query, $pages, $website);
         $pageType = $relatedPage ? $this->pageType($relatedPage->page_url, $website) : 'unknown';
@@ -87,12 +93,12 @@ class GrowthOpportunityGenerator
                 'opportunity_type' => 'review_trust_path',
                 'opportunity_category' => 'reputation_conversion',
                 'problem' => 'This search is reputation-led rather than service-discovery-led.',
-                'recommendation' => 'Strengthen trust signals, review visibility, credentials, and the appointment path on the relevant about or practitioner page.',
-                'expected_result' => 'Visitors who already know the practitioner can reach a confident booking decision faster.',
+                'recommendation' => 'Strengthen trust signals, review visibility, credentials, and the '.$goal['journey_label'].' on the relevant brand or representative page.',
+                'expected_result' => 'Brand-aware visitors can reach a confident decision and move toward '.$goal['primary_action_label'].' faster.',
                 'priority' => 'medium',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Add trust proof and a clear booking CTA near practitioner information.',
+                'conversion_action' => 'Add trust proof and a clear '.$goal['cta_label'].' near brand or representative information.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
@@ -103,13 +109,13 @@ class GrowthOpportunityGenerator
                 'source_value' => $query->query,
                 'opportunity_type' => 'branded_practitioner_conversion',
                 'opportunity_category' => 'branded_visibility',
-                'problem' => 'This practitioner-name search is useful for trust and conversion but should not dominate acquisition growth.',
-                'recommendation' => 'Improve the about/practitioner page with credentials, appointment CTA, and links to the most relevant service pages.',
-                'expected_result' => 'Known-name visitors can convert more easily while service pages carry acquisition growth.',
+                'problem' => 'This brand or representative-name search is useful for trust and conversion but should not dominate acquisition growth.',
+                'recommendation' => 'Improve the about or brand page with credentials, a '.$goal['cta_label'].', and links to the most relevant offer pages.',
+                'expected_result' => 'Brand-aware visitors can convert more easily while high-intent pages carry acquisition growth.',
                 'priority' => 'medium',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Connect branded traffic to service pages and appointment actions.',
+                'conversion_action' => 'Connect branded traffic to high-intent pages and '.$goal['primary_action_label'].'.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
@@ -120,13 +126,13 @@ class GrowthOpportunityGenerator
                 'source_value' => $query->query,
                 'opportunity_type' => 'increase_service_ctr',
                 'opportunity_category' => 'acquisition_growth',
-                'problem' => 'This service or patient-intent query has visibility but a low click-through rate.',
-                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite the title/meta for patient intent and align the page intro with the search need.'),
-                'expected_result' => 'More visits from existing service impressions and a clearer path toward appointment actions.',
+                'problem' => 'This high-intent query has visibility but a low click-through rate.',
+                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite the title/meta for audience intent and align the page intro with the search need.'),
+                'expected_result' => 'More visits from existing impressions and a clearer path toward '.$goal['primary_action_label'].'.',
                 'priority' => $query->impressions >= 50 && $query->position <= 12 ? 'high' : 'medium',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Add or improve an appointment CTA near the top of the mapped service page.',
+                'conversion_action' => 'Add or improve the '.$goal['cta_label'].' near the top of the mapped priority page.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
@@ -138,12 +144,12 @@ class GrowthOpportunityGenerator
                 'opportunity_type' => 'improve_service_position',
                 'opportunity_category' => 'service_page_growth',
                 'problem' => 'This service query is close to stronger visibility but needs more authority and relevance.',
-                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Strengthen the mapped service page with better headings, internal links, target-location relevance, and a booking CTA.'),
+                'recommendation' => $this->queryRecommendation($website, $query, $relatedPage, 'Strengthen the mapped priority page with better headings, internal links, relevant audience framing, and a '.$goal['cta_label'].'.'),
                 'expected_result' => 'The page may earn more clicks from relevant visitors already searching for this service.',
                 'priority' => 'high',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Improve content relevance and booking CTA on the mapped service page.',
+                'conversion_action' => 'Improve content relevance and the '.$goal['cta_label'].' on the mapped priority page.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
@@ -156,13 +162,13 @@ class GrowthOpportunityGenerator
                 'opportunity_category' => $isServiceIntent ? 'acquisition_growth' : 'service_page_growth',
                 'problem' => 'This useful query is visible in search but has not produced clicks.',
                 'recommendation' => $relatedPage
-                    ? $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite title/meta, improve intent match, and add a stronger appointment CTA.')
+                    ? $this->queryRecommendation($website, $query, $relatedPage, 'Rewrite title/meta, improve intent match, and add a stronger '.$goal['cta_label'].'.')
                     : 'Create or strengthen a page for this search intent.',
-                'expected_result' => 'The search result can better match patients looking for this topic.',
+                'expected_result' => 'The search result can better match the target audience looking for this topic.',
                 'priority' => $intent === 'informational' ? 'medium' : 'high',
                 'intent' => $intent,
                 'related_page_url' => $relatedPage?->page_url,
-                'conversion_action' => 'Improve snippet and connect the visitor to a relevant service page.',
+                'conversion_action' => 'Improve the snippet and connect the visitor to a relevant priority page and '.$goal['primary_action_label'].'.',
                 'score' => $this->score($query, 'query', $intent, $relatedPage?->page_url),
             ], $query);
         }
@@ -173,6 +179,7 @@ class GrowthOpportunityGenerator
     private function pageRules(Website $website, GscPage $page): int
     {
         $created = 0;
+        $goal = $this->goalProfiles->forWebsite($website);
         $type = $this->pageType($page->page_url, $website);
 
         if ($type === 'legal') {
@@ -186,12 +193,12 @@ class GrowthOpportunityGenerator
                 'opportunity_type' => $type === 'service_page' ? 'service_page_conversion' : 'improve_booking_cta',
                 'opportunity_category' => $type === 'service_page' ? 'service_page_growth' : 'conversion_improvement',
                 'problem' => $type === 'service_page'
-                    ? 'This service page can support acquisition and appointment conversion.'
-                    : 'This page receives search traffic and should guide visitors toward appointment actions.',
+                    ? 'This priority offer page can support acquisition and the configured primary conversion.'
+                    : 'This page receives search traffic and should guide visitors toward '.$goal['primary_action_label'].'.',
                 'recommendation' => $type === 'blog'
-                    ? 'Add a contextual link from this content to the relevant service page and include a soft appointment CTA.'
-                    : 'Improve the page-specific appointment CTA, repeat it after key sections, and link to the most relevant service journey.',
-                'expected_result' => 'More appointment actions from existing traffic.',
+                    ? 'Add a contextual link from this content to the relevant priority page and include a soft '.$goal['cta_label'].'.'
+                    : 'Improve the page-specific '.$goal['cta_label'].', repeat it after key sections, and link to the most relevant '.$goal['journey_label'].'.',
+                'expected_result' => 'More visitors can move toward '.$goal['primary_action_label'].' from existing traffic.',
                 'priority' => $type === 'service_page' ? 'high' : 'medium',
                 'intent' => $type === 'service_page' ? 'service_intent' : 'informational',
                 'related_page_url' => $page->page_url,
@@ -206,13 +213,13 @@ class GrowthOpportunityGenerator
                 'source_value' => $page->page_url,
                 'opportunity_type' => 'increase_service_page_ctr',
                 'opportunity_category' => 'service_page_growth',
-                'problem' => 'This service page has strong visibility, low CTR, and conversion potential.',
-                'recommendation' => 'Rewrite title/meta for patient intent and improve the landing page appointment CTA.',
-                'expected_result' => 'More clicks from existing impressions and more appointment actions from visitors.',
+                'problem' => 'This priority offer page has strong visibility, low CTR, and conversion potential.',
+                'recommendation' => 'Rewrite title/meta for target-audience intent and improve the landing page '.$goal['cta_label'].'.',
+                'expected_result' => 'More clicks from existing impressions and more progress toward '.$goal['primary_action_label'].'.',
                 'priority' => 'high',
                 'intent' => 'service_intent',
                 'related_page_url' => $page->page_url,
-                'conversion_action' => 'Improve title/meta and above-the-fold booking CTA.',
+                'conversion_action' => 'Improve title/meta and the above-the-fold '.$goal['cta_label'].'.',
                 'score' => $this->score($page, 'page', 'service_intent', $page->page_url),
             ], $page);
         }
@@ -336,7 +343,7 @@ class GrowthOpportunityGenerator
             return 'blog';
         }
 
-        if ($this->isPriorityServicePage($website, $url) || Str::contains($path, ['traitements', 'sexologie', 'ejaculation', 'desir', 'orgasme', 'therapie', 'osteopath', 'drainage', 'cranio', 'sport', 'digestif', 'consultation', 'auriculo'])) {
+        if ($this->isPriorityServicePage($website, $url) || Str::contains($path, ['traitements', 'sexologie', 'ejaculation', 'desir', 'orgasme', 'therapie', 'osteopath', 'drainage', 'cranio', 'sport', 'digestif', 'consultation', 'auriculo', 'pricing', 'signup', 'register', 'trial', 'features', 'loyalty', 'rewards', 'campaigns', 'business'])) {
             return 'service_page';
         }
 
@@ -360,24 +367,27 @@ class GrowthOpportunityGenerator
 
     public function conversionRecommendationForPage(GscPage $page, ?Website $website = null): string
     {
+        $goal = $website ? $this->goalProfiles->forWebsite($website) : $this->goalProfiles->profiles()['custom'];
+
         return match ($this->pageType($page->page_url, $website)) {
-            'homepage' => 'Check hero CTA and appointment path.',
-            'service_page' => 'Improve the service-specific appointment CTA and add internal links from high-traffic branded pages.',
-            'blog' => 'Add contextual link to the relevant service page.',
+            'homepage' => 'Check the hero '.$goal['cta_label'].' and '.$goal['journey_label'].'.',
+            'service_page' => 'Improve the page-specific '.$goal['cta_label'].' and add internal links from high-traffic pages.',
+            'blog' => 'Add a contextual link to the relevant priority page and '.$goal['primary_action_label'].'.',
             'legal' => 'No conversion action needed.',
-            default => $page->clicks > 0 ? 'Clarify the next appointment action.' : 'Review title/meta or noindex if low value.',
+            default => $page->clicks > 0 ? 'Clarify the next action toward '.$goal['primary_action_label'].'.' : 'Review title/meta or noindex if low value.',
         };
     }
 
     private function queryRecommendation(Website $website, GscQuery $query, ?GscPage $relatedPage, string $fallback): string
     {
         $location = collect($website->serviceProfile()['target_locations'])->first() ?: $website->target_location ?: 'the target location';
+        $goal = $this->goalProfiles->forWebsite($website);
 
         if ($relatedPage) {
             return $fallback.' Use '.$location.' relevance only where it matches the website settings.';
         }
 
-        return 'Create or strengthen a service page for "'.$query->query.'" and connect it to the appointment path for '.$location.'.';
+        return 'Create or strengthen a priority page for "'.$query->query.'" and connect it to the '.$goal['journey_label'].' for '.$location.'.';
     }
 
     private function missingPriorityPages(Website $website, Collection $pages): array

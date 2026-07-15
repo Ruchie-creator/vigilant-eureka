@@ -15,7 +15,7 @@
                 <div><span class="text-slate-500">Clicks</span><p class="font-semibold tabular-nums">{{ number_format(is_array($device) ? $device['clicks'] : $device->clicks) }}</p></div>
                 <div><span class="text-slate-500">Impr.</span><p class="font-semibold tabular-nums">{{ number_format(is_array($device) ? $device['impressions'] : ($device->impressions ?? 0)) }}</p></div>
                 <div><span class="text-slate-500">CTR / Pos.</span><p class="font-semibold tabular-nums">{{ number_format(is_array($device) ? $device['ctr'] : $device->ctr, 2) }}% · {{ number_format(is_array($device) ? $device['position'] : $device->position, 1) }}</p></div>
-                <div class="text-slate-600">{{ is_array($device) ? $device['recommendation'] : 'Keep the conversion path clear and verify booking interactions are tracked.' }}</div>
+                <div class="text-slate-600">{{ is_array($device) ? $device['recommendation'] : 'Keep the conversion path clear and verify configured conversion events are tracked.' }}</div>
             </div>
         @empty
             <div class="px-5 py-10 text-center text-sm text-slate-500">No device data yet.</div>

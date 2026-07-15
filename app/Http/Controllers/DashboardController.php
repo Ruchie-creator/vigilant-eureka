@@ -12,13 +12,14 @@ use App\Models\MarketingTask;
 use App\Models\SeoAudit;
 use App\Models\Website;
 use App\Models\WeeklyReport;
+use App\Services\ConversionGoalProfileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, ConversionGoalProfileService $goalProfiles): View
     {
         $hasGscTables = Schema::hasTable('gsc_daily_metrics');
         $hasGscDevices = Schema::hasTable('gsc_devices');
@@ -118,11 +119,21 @@ class DashboardController extends Controller
         ];
 
         $websites = Website::orderBy('name')->get(['id', 'name']);
+        $selectedWebsite = filled($filters['website_id']) ? Website::find($filters['website_id']) : null;
+        $goalContext = $selectedWebsite
+            ? $goalProfiles->forWebsite($selectedWebsite)
+            : [
+                'label' => $websites->count() === 1 ? $goalProfiles->forWebsite(Website::find($websites->first()->id))['label'] : 'Multiple workspace goals',
+                'primary_action_label' => $websites->count() === 1 ? $goalProfiles->forWebsite(Website::find($websites->first()->id))['primary_action_label'] : 'Select a workspace to focus the primary action',
+                'data_sources' => ['connected workspace data sources'],
+                'approval_required' => ['campaigns', 'messages', 'website_changes'],
+            ];
         $countries = $hasGscCountries ? GscCountry::query()->select('country')->distinct()->orderBy('country')->pluck('country') : collect();
 
         return view('dashboard', [
             'filters' => $filters,
             'websites' => $websites,
+            'goalContext' => $goalContext,
             'countries' => $countries,
             'dateContext' => $dateContext,
             'chartData' => $chartData,
@@ -134,7 +145,7 @@ class DashboardController extends Controller
             'averagePosition' => (float) $metrics->position,
             'mobileClicks' => $mobileClicks,
             'openGrowthOpportunities' => $hasGrowth ? (clone $growthQuery)->count() : 0,
-            'pendingConversionTasks' => MarketingTask::whereIn('status', ['pending', 'in_progress'])->where('title', 'like', '%booking%')->count(),
+            'pendingConversionTasks' => MarketingTask::whereIn('status', ['pending', 'in_progress'])->count(),
             'lastSyncStatus' => $latestSync?->status ?? 'No sync yet',
             'latestSync' => $latestSync,
             'topConversionPriority' => $hasGrowth ? (clone $growthQuery)->with('website')
@@ -147,7 +158,7 @@ class DashboardController extends Controller
                 ->when($hasGrowth, fn ($query) => $query->with(['growthOpportunities' => fn ($query) => $query->where('status', 'open')->when($hasGrowthCategory, fn ($query) => $query->whereNotIn('opportunity_category', ['branded_visibility', 'reputation_conversion', 'low_value']))->when($hasGrowthScore, fn ($query) => $query->orderByDesc('score'))->limit(1)]))
                 ->latest()
                 ->get()
-                ->map(function (Website $website) use ($hasGscTables, $hasGscSyncs, $hasGrowth) {
+                ->map(function (Website $website) use ($hasGscTables, $hasGscSyncs, $hasGrowth, $goalProfiles) {
                     $summary = $hasGscSyncs ? $website->gscSyncs()->where('status', 'success')->latest('synced_at')->first() : null;
                     $summary ??= $hasGscTables ? $website->gscDailyMetrics()
                         ->where('date', '>=', now()->subDays(28)->toDateString())
@@ -163,6 +174,7 @@ class DashboardController extends Controller
                         'top_opportunity' => $hasGrowth ? $website->growthOpportunities->first() : null,
                         'pending_tasks' => $website->pending_tasks_count,
                         'sync_context' => $summary instanceof GscSync ? $summary : null,
+                        'goal_profile' => $goalProfiles->forWebsite($website),
                     ];
                 }),
             'latestAudits' => SeoAudit::with('website')->latest()->limit(5)->get(),

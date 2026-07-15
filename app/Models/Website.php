@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Website extends Model
 {
     use HasFactory;
+
+    protected $hidden = ['tracking_key'];
 
     protected $fillable = [
         'name',
@@ -24,6 +27,11 @@ class Website extends Model
         'brand_terms',
         'priority_pages',
         'status',
+        'primary_conversion_goal',
+        'secondary_conversion_goals',
+        'target_audience',
+        'business_model',
+        'conversion_labels',
         'search_console_site_id',
         'gsc_last_synced_at',
         'notes',
@@ -38,7 +46,16 @@ class Website extends Model
             'practitioner_names' => 'array',
             'brand_terms' => 'array',
             'priority_pages' => 'array',
+            'secondary_conversion_goals' => 'array',
+            'conversion_labels' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Website $website): void {
+            $website->tracking_key ??= Str::random(48);
+        });
     }
 
     public function seoAudits(): HasMany
@@ -104,6 +121,21 @@ class Website extends Model
     public function conversionChecks(): HasMany
     {
         return $this->hasMany(ConversionCheck::class);
+    }
+
+    public function conversionEvents(): HasMany
+    {
+        return $this->hasMany(ConversionEvent::class);
+    }
+
+    public function agentRuns(): HasMany
+    {
+        return $this->hasMany(AgentRun::class);
+    }
+
+    public function agentActions(): HasMany
+    {
+        return $this->hasMany(AgentAction::class);
     }
 
     public function serviceProfile(): array

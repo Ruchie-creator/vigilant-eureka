@@ -1,3 +1,6 @@
+@php
+    $primaryActionLabel = $goalProfile['primary_action_label'] ?? 'Complete the primary conversion';
+@endphp
 <section class="rounded-lg bg-white shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
@@ -10,13 +13,24 @@
     </div>
     <div class="grid gap-4 p-5">
         @forelse($opportunities as $opportunity)
+            @php
+                $typeLabel = str_replace('_', ' ', ucfirst($opportunity->opportunity_type));
+                $categoryLabel = str_replace('_', ' ', ucfirst($opportunity->opportunity_category ?? 'conversion_improvement'));
+                if (($goalProfile['key'] ?? null) !== 'appointment_booking') {
+                    $typeLabel = str_ireplace(['service page', 'booking', 'practitioner'], ['priority page', 'primary conversion', 'brand representative'], $typeLabel);
+                }
+                $categoryLabel = str_ireplace('service page', 'priority page', $categoryLabel);
+            @endphp
             <article class="rounded-lg bg-slate-50 p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06)]">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">{{ str_replace('_', ' ', ucfirst($opportunity->opportunity_type)) }}</span>
-                            <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-[0_0_0_1px_rgba(5,18,55,0.08)]">{{ str_replace('_', ' ', ucfirst($opportunity->opportunity_category ?? 'conversion_improvement')) }}</span>
+                            <span class="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">{{ $typeLabel }}</span>
+                            <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-[0_0_0_1px_rgba(5,18,55,0.08)]">{{ $categoryLabel }}</span>
                             <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $opportunity->priority === 'high' ? 'bg-rose-50 text-rose-700' : ($opportunity->priority === 'medium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-700') }}">{{ ucfirst($opportunity->priority) }}</span>
+                            @if(($opportunity->conversion_events_count ?? 0) > 0)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"><i data-lucide="mouse-pointer-click" class="size-3.5"></i>{{ number_format($opportunity->conversion_events_count) }} tracked</span>
+                            @endif
                         </div>
                         <h3 class="mt-3 text-balance text-lg font-semibold text-navy">{{ $opportunity->problem ?: 'Growth opportunity detected' }}</h3>
                         <p class="mt-2 break-all text-sm text-slate-500">{{ ucfirst(str_replace('_', ' ', $opportunity->source_type)) }}: <span class="font-medium text-slate-700">{{ $opportunity->source_value }}</span></p>
@@ -36,11 +50,11 @@
                     </div>
                     <div class="rounded-lg bg-white p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06)]">
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Expected result</p>
-                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $opportunity->expected_result ?: 'Better search visibility and a clearer appointment path.' }}</p>
+                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $opportunity->expected_result ?: 'Better search visibility and a clearer path toward '.$primaryActionLabel.'.' }}</p>
                     </div>
                     <div class="rounded-lg bg-white p-4 shadow-[0_0_0_1px_rgba(5,18,55,0.06)]">
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Conversion impact</p>
-                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $opportunity->conversion_action ?: 'Improve the path from qualified visit to appointment action.' }}</p>
+                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ $opportunity->conversion_action ?: 'Improve the path from a qualified visit toward '.$primaryActionLabel.'.' }}</p>
                     </div>
                 </div>
 
@@ -55,6 +69,7 @@
                         <div><dt class="text-xs font-semibold uppercase text-slate-500">Position</dt><dd class="mt-1 tabular-nums text-slate-700">{{ number_format($opportunity->position, 1) }}</dd></div>
                         <div><dt class="text-xs font-semibold uppercase text-slate-500">Device</dt><dd class="mt-1 text-slate-700">All devices</dd></div>
                         <div><dt class="text-xs font-semibold uppercase text-slate-500">Country</dt><dd class="mt-1 text-slate-700">All countries</dd></div>
+                        <div><dt class="text-xs font-semibold uppercase text-slate-500">Tracking ID</dt><dd class="mt-1 font-mono text-slate-700">{{ $opportunity->id }}</dd></div>
                     </dl>
                 </details>
 

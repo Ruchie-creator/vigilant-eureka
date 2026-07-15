@@ -43,7 +43,8 @@ class MarketingTaskController extends Controller
             })
             ->when($filters['origin'] === 'opportunity', fn ($query) => $query->whereNotNull('growth_opportunity_id'))
             ->when($filters['origin'] === 'ai_insight', fn ($query) => $query->whereNotNull('ai_insight_id')->whereNull('growth_opportunity_id'))
-            ->when($filters['origin'] === 'manual', fn ($query) => $query->whereNull('growth_opportunity_id')->whereNull('ai_insight_id'))
+            ->when($filters['origin'] === 'agent_action', fn ($query) => $query->where('source_type', 'agent_action'))
+            ->when($filters['origin'] === 'manual', fn ($query) => $query->whereNull('growth_opportunity_id')->whereNull('ai_insight_id')->where(fn ($query) => $query->whereNull('source_type')->orWhere('source_type', '!=', 'agent_action')))
             ->latest();
 
         $tasks = $query->get();
@@ -114,7 +115,8 @@ class MarketingTaskController extends Controller
             'expected_result' => $aiInsight->expected_result,
             'priority' => $aiInsight->priority,
             'source_type' => 'ai_insight',
-            'source_value' => $aiInsight->title,
+            'source_value' => $aiInsight->affected_source_value ?: $aiInsight->title,
+            'related_page_url' => ($aiInsight->data_used['related_page'] ?? null),
             'status' => 'pending',
         ]);
 

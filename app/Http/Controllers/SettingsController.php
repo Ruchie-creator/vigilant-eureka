@@ -71,14 +71,12 @@ class SettingsController extends Controller
         return [
             'app_url' => config('app.url'),
             'openai' => [
-                'api_key_masked' => $this->mask(config('services.openai.key')),
                 'has_api_key' => filled(config('services.openai.key')),
                 'model' => config('services.openai.model', 'gpt-4o-mini'),
                 'timeout' => config('services.openai.timeout', 20),
             ],
             'google' => [
                 'client_id' => config('services.google.client_id'),
-                'client_secret_masked' => $this->mask(config('services.google.client_secret')),
                 'has_client_secret' => filled(config('services.google.client_secret')),
                 'redirect_uri' => config('services.google.redirect_uri'),
                 'scope' => config('services.google.search_console_scope'),
@@ -89,20 +87,10 @@ class SettingsController extends Controller
                 'port' => config('mail.mailers.smtp.port'),
                 'username' => config('mail.mailers.smtp.username'),
                 'has_password' => filled(config('mail.mailers.smtp.password')),
-                'password_masked' => $this->mask(config('mail.mailers.smtp.password')),
                 'encryption' => config('mail.mailers.smtp.encryption'),
                 'from_address' => config('mail.from.address'),
                 'from_name' => config('mail.from.name'),
             ],
         ];
-    }
-
-    private function mask(?string $value): string
-    {
-        if (blank($value)) {
-            return 'Not set';
-        }
-
-        return str_repeat('*', max(8, min(16, strlen($value) - 4))).substr($value, -4);
     }
 }
