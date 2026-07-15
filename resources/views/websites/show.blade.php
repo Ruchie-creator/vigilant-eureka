@@ -47,13 +47,13 @@
                 <form method="POST" action="{{ route('websites.search-console.sync', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(1,101,118,.28)]" @disabled(! $website->searchConsoleSite || $propertyMismatch)><i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>Sync search data</button></form>
                 <form method="POST" action="{{ route('websites.ai-insights.store', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/[.09] px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)] hover:bg-white/[.14]"><i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>Generate AI insight</button></form>
                 <form method="POST" action="{{ route('websites.audit', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/[.09] px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)] hover:bg-white/[.14]"><i data-lucide="scan-search" class="h-4 w-4" aria-hidden="true"></i>Run SEO scan</button></form>
-                <a href="{{ route('settings') }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/[.09] px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)] hover:bg-white/[.14]"><i data-lucide="settings-2" class="h-4 w-4" aria-hidden="true"></i>GSC settings</a>
+                <a href="#search-console-setup" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white/[.09] px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)] hover:bg-white/[.14]"><i data-lucide="settings-2" class="h-4 w-4" aria-hidden="true"></i>Manage GSC</a>
                 @if($website->gsc_last_synced_at)<form method="POST" action="{{ route('websites.search-console.reset', $website) }}" class="sm:ml-auto" onsubmit="return confirm('Reset synced Search Console metrics and growth opportunities for this website? Existing tasks will be kept.');">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-200 shadow-[inset_0_0_0_1px_rgba(251,113,133,.24)] hover:bg-rose-400/20"><i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i>Reset analysis</button></form>@endif
             </div>
         </div>
     </section>
 
-    <section class="mt-6 rounded-lg bg-white p-5 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]">
+    <section id="search-console-setup" class="mt-6 scroll-mt-24 rounded-lg bg-white p-5 shadow-[0_0_0_1px_rgba(5,18,55,0.06),0_16px_40px_rgba(5,18,55,0.08)]">
         <div class="flex flex-wrap items-start justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wide text-teal">Workspace goal</p><h2 class="mt-1 text-lg font-semibold text-navy">{{ $goalProfile['label'] }}</h2><p class="mt-1 text-sm text-slate-500">The main action is <span class="font-semibold text-navy">{{ $goalProfile['primary_action_label'] }}</span>.</p></div><a href="{{ route('websites.edit', $website) }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-teal shadow-[0_0_0_1px_rgba(1,101,118,0.18)]"><i data-lucide="settings-2" class="size-4"></i>Edit goal</a></div>
         <dl class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-lg bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Target audience</dt><dd class="mt-1 text-sm font-semibold text-navy">{{ $goalProfile['target_audience'] ?: 'Not configured' }}</dd></div>
@@ -72,6 +72,31 @@
             </div>
             <span class="rounded-lg px-3 py-1 text-xs font-semibold {{ $syncStatus === 'success' || $syncStatus === 'Data available' ? 'bg-emerald-50 text-emerald-700' : ($syncStatus === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700') }}">{{ ucfirst($syncStatus) }}</span>
         </div>
+        @if(! $googleAccount)
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-slate-50 p-4">
+                <div><p class="font-semibold text-navy">Connect Google Search Console</p><p class="mt-1 text-sm text-slate-500">Connect the Google account that owns this website property, then return here to select it.</p></div>
+                <a href="{{ route('google.search-console.connect') }}" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white"><i data-lucide="link" class="size-4"></i>Connect Google</a>
+            </div>
+        @else
+            <div class="mt-4 rounded-lg bg-slate-50 p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-semibold text-navy">Select a property for this workspace</p><p class="mt-1 text-sm text-slate-500">Connected account: {{ $googleAccount->email ?: 'Google account' }}. Only properties matching {{ parse_url($website->url, PHP_URL_HOST) }} are shown.</p></div><a href="{{ route('google.search-console.sites') }}" class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-teal shadow-[0_0_0_1px_rgba(1,101,118,.16)]"><i data-lucide="refresh-cw" class="size-3.5"></i>Refresh properties</a></div>
+                @if($matchingSearchConsoleSites->isNotEmpty())
+                    <form method="POST" action="{{ route('websites.search-console.assign', $website) }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                        @csrf
+                        <label class="grid min-w-0 flex-1 gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Matching property<select name="search_console_site_id" required class="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case tracking-normal text-navy">@foreach($matchingSearchConsoleSites as $site)<option value="{{ $site->id }}" @selected($website->search_console_site_id === $site->id)>{{ $site->site_url }} · {{ $site->permission_level ?: 'Permission unknown' }}</option>@endforeach</select></label>
+                        <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white"><i data-lucide="check" class="size-4"></i>{{ $website->searchConsoleSite ? 'Update property' : 'Select property' }}</button>
+                    </form>
+                @else
+                    <div class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900"><span class="font-semibold">No matching property is loaded.</span> Refresh properties after adding or verifying {{ parse_url($website->url, PHP_URL_HOST) }} in Google Search Console.</div>
+                @endif
+                @if($website->searchConsoleSite)
+                    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+                        @if(! $propertyMismatch)<form method="POST" action="{{ route('websites.search-console.sync', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white"><i data-lucide="refresh-cw" class="size-4"></i>Sync last 28 days</button></form>@endif
+                        <form method="POST" action="{{ route('websites.search-console.disconnect', $website) }}">@csrf<button class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-rose-700 shadow-[0_0_0_1px_rgba(225,29,72,.16)]"><i data-lucide="unlink" class="size-4"></i>Remove property</button></form>
+                    </div>
+                @endif
+            </div>
+        @endif
         @if($propertyMismatch)
             <div class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-[0_0_0_1px_rgba(245,158,11,0.2)]">
                 <span class="font-semibold">Search Console property mismatch.</span>
