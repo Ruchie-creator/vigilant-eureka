@@ -14,6 +14,7 @@ class MarketingDirectorAgentService extends AgentService
             ->where('website_id', $website->id)
             ->where('status', 'pending')
             ->whereHas('run.agent', fn ($query) => $query->where('slug', '!=', 'marketing-director'))
+            ->orderByDesc('learning_score')
             ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->latest()
             ->first();

@@ -11,7 +11,7 @@ use InvalidArgumentException;
 
 class AgentMemoryService
 {
-    public const TYPES = ['workspace_context', 'previous_decision', 'approved_action', 'ignored_action', 'completed_task', 'performance_pattern', 'conversion_goal_context', 'user_instruction'];
+    public const TYPES = ['workspace_context', 'previous_decision', 'approved_action', 'ignored_action', 'completed_task', 'successful_action', 'unsuccessful_action', 'inconclusive_action', 'performance_pattern', 'conversion_goal_context', 'user_instruction'];
 
     public function remember(Agent $agent, ?Website $website, string $type, string $key, string $value, array $attributes = []): AgentMemory
     {
@@ -76,6 +76,7 @@ class AgentMemoryService
         return AgentMemory::where('agent_id', $agent->id)
             ->where(fn (Builder $query) => $query->whereNull('website_id')->when($website, fn (Builder $query) => $query->orWhere('website_id', $website->id)))
             ->where(fn (Builder $query) => $query->whereNull('valid_from')->orWhere('valid_from', '<=', now()))
+            ->where('enabled', true)
             ->where(fn (Builder $query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }
 
@@ -102,6 +103,6 @@ class AgentMemoryService
 
     private function attributes(array $attributes): array
     {
-        return collect($attributes)->only(['confidence', 'source_type', 'source_id', 'valid_from', 'expires_at'])->all();
+        return collect($attributes)->only(['confidence', 'enabled', 'source_type', 'source_id', 'learning_metadata', 'review_notes', 'last_used_at', 'valid_from', 'expires_at'])->all();
     }
 }

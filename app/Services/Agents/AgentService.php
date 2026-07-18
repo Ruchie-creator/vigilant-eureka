@@ -22,11 +22,14 @@ abstract class AgentService
     {
         $goal = $this->goalProfiles->forWebsite($website);
         $memoryService = app(AgentMemoryService::class);
+        $learningService = app(AgentLearningService::class);
         $handoffService = app(AgentHandoffService::class);
         $memoryContext = $memoryService->buildAgentMemoryContext($agent, $website);
         $handoffContext = $handoffService->buildHandoffContext($agent, $website);
+        $learningContext = $learningService->buildLearningContext($agent, $website);
         $inputSummary = 'Analyze '.$website->name.' for '.$goal['label'].' using connected workspace evidence.'
             .' Memory context: '.json_encode($memoryContext, JSON_UNESCAPED_SLASHES)
+            .' Outcome learning context: '.json_encode($learningContext, JSON_UNESCAPED_SLASHES)
             .' Accepted handoffs: '.json_encode($handoffContext, JSON_UNESCAPED_SLASHES);
         if (filled($runMetadata['trigger_reason'] ?? null)) {
             $inputSummary .= ' Trigger reason: '.$runMetadata['trigger_reason']
@@ -59,7 +62,7 @@ abstract class AgentService
             'status' => 'pending',
             'input_summary' => $inputSummary,
             'input_hash' => hash('sha256', $inputSummary),
-            'metadata' => [...$runMetadata, 'conversion_goal' => $goal['key'], 'approval_required' => $goal['approval_required'], 'memory_context' => $memoryContext, 'handoff_context' => $handoffContext],
+            'metadata' => [...$runMetadata, 'conversion_goal' => $goal['key'], 'approval_required' => $goal['approval_required'], 'memory_context' => $memoryContext, 'learning_context' => $learningContext, 'handoff_context' => $handoffContext],
         ];
         $run = $existingRun ?: AgentRun::create($attributes);
 
@@ -72,6 +75,7 @@ abstract class AgentService
         try {
             $run->update(['status' => 'running', 'started_at' => now()]);
             $action = $this->action($website, $goal);
+            $learningScore = $learningService->scoreRecommendation($agent, $website, $action);
             $metadata = [
                 'what_i_found' => $action['found'],
                 'why_it_matters' => $action['why'],
@@ -98,6 +102,7 @@ abstract class AgentService
                 'expected_result' => $action['expected'],
                 'metadata' => $metadata,
                 'original_action_id' => $runMetadata['original_action_id'] ?? null,
+                ...$learningScore,
             ];
             $createdAction = $existingRun && $run->actions()->exists()
                 ? tap($run->actions()->oldest()->first())->update($actionPayload)

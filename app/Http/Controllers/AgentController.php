@@ -30,6 +30,7 @@ class AgentController extends Controller
             'agent' => $agent, 'runs' => $runs, 'websites' => Website::where('status', 'active')->orderBy('name')->get(),
             'memories' => $agent->memories()->with('website')->latest()->limit(8)->get(),
             'handoffs' => AgentHandoff::with(['website', 'fromAgent', 'toAgent'])->where(fn ($query) => $query->where('from_agent_id', $agent->id)->orWhere('to_agent_id', $agent->id))->latest()->limit(8)->get(),
+            'learningSummary' => AgentMemory::where('agent_id', $agent->id)->where('enabled', true)->whereIn('memory_type', ['successful_action', 'unsuccessful_action', 'inconclusive_action', 'performance_pattern'])->get()->groupBy('memory_type')->map->count(),
         ]);
     }
 
@@ -72,6 +73,7 @@ class AgentController extends Controller
                 'outcomes_no_change' => $website->actionOutcomes()->where('status', 'no_change')->count(),
                 'outcomes_declined' => $website->actionOutcomes()->where('status', 'declined')->count(),
                 'outcomes_inconclusive' => $website->actionOutcomes()->where('status', 'inconclusive')->count(),
+                'learning_patterns' => $website->agentMemories()->where('enabled', true)->whereIn('memory_type', ['successful_action', 'unsuccessful_action', 'inconclusive_action', 'performance_pattern'])->count(),
             ],
         ]);
     }

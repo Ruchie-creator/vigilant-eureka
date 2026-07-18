@@ -6,6 +6,7 @@ use App\Models\ActionOutcome;
 use App\Models\Agent;
 use App\Models\Website;
 use App\Services\Agents\ActionOutcomeService;
+use App\Services\Agents\AgentLearningService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,11 +45,14 @@ class ActionOutcomeController extends Controller
         return back()->with('success', $actionOutcome->fresh()->status === 'waiting' ? 'The post-action period is incomplete, so evaluation remains waiting.' : 'Outcome evaluated against its equivalent baseline.');
     }
 
-    public function update(Request $request, ActionOutcome $actionOutcome, ActionOutcomeService $service): RedirectResponse
+    public function update(Request $request, ActionOutcome $actionOutcome, ActionOutcomeService $service, AgentLearningService $learning): RedirectResponse
     {
         $data = $request->validate(['operation' => ['required', Rule::in(['window', 'inconclusive', 'notes'])], 'window_days' => ['nullable', 'integer', 'min:7', 'max:90'], 'review_notes' => ['nullable', 'string', 'max:5000']]);
         if ($data['operation'] === 'window') $service->captureBaseline($actionOutcome, (int) ($data['window_days'] ?? 14));
-        elseif ($data['operation'] === 'inconclusive') $actionOutcome->update(['status' => 'inconclusive', 'confidence' => 'low', 'review_notes' => $data['review_notes'] ?? $actionOutcome->review_notes, 'outcome_summary' => 'Marked inconclusive by a human reviewer; no causal claim is made.', 'evaluated_at' => now()]);
+        elseif ($data['operation'] === 'inconclusive') {
+            $actionOutcome->update(['status' => 'inconclusive', 'confidence' => 'low', 'review_notes' => $data['review_notes'] ?? $actionOutcome->review_notes, 'outcome_summary' => 'Marked inconclusive by a human reviewer; no causal claim is made.', 'evaluated_at' => now()]);
+            $learning->learnFromOutcome($actionOutcome->fresh());
+        }
         else $actionOutcome->update(['review_notes' => $data['review_notes'] ?? null]);
         return back()->with('success', 'Outcome review updated.');
     }

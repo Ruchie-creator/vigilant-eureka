@@ -9,6 +9,7 @@
                     <span class="rounded-full bg-teal/10 px-2.5 py-1 text-xs font-semibold text-teal">{{ $action->run->agent->name }}</span>
                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ in_array($action->priority, ['critical','high']) ? 'bg-rose-50 text-rose-700' : ($action->priority === 'medium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600') }}">{{ ucfirst($action->priority) }}</span>
                     <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ ucfirst($action->status) }}</span>
+                    @if($action->confidence_score !== null)<span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{{ number_format($action->confidence_score*100) }}% confidence</span>@endif
                 </div>
                 <h3 class="mt-3 text-lg font-bold text-navy">{{ $action->title }}</h3>
                 <p class="mt-1 text-xs text-slate-400">{{ $action->created_at->diffForHumans() }}</p>
@@ -29,6 +30,7 @@
             <i data-lucide="{{ ($meta['approval_required'] ?? true) ? 'shield-alert' : 'shield-check' }}" class="size-4"></i>
             Approval required: {{ ($meta['approval_required'] ?? true) ? 'Yes. No external action has been executed.' : 'No for this internal analysis step.' }}
         </div>
+        @if($action->learning_summary)<div class="mt-3 rounded-lg bg-indigo-50 p-3 text-xs leading-5 text-indigo-900"><strong>Outcome learning:</strong> {{ $action->learning_summary }}</div>@endif
 
         <div class="mt-4 flex flex-wrap gap-2">
             <form method="POST" action="{{ route('agent-actions.tasks.store', $action) }}">@csrf<button class="min-h-10 rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white">Create Task</button></form>

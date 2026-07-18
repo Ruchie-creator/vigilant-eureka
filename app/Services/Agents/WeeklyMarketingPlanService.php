@@ -14,7 +14,7 @@ class WeeklyMarketingPlanService
     {
         $start ??= now()->startOfWeek();
         $end ??= now()->endOfWeek();
-        $actions = $website->agentActions()->with('run.agent')->whereIn('status', ['pending', 'reviewed', 'approved'])->latest()->limit(30)->get();
+        $actions = $website->agentActions()->with('run.agent')->whereIn('status', ['pending', 'reviewed', 'approved'])->orderByDesc('learning_score')->latest()->limit(30)->get();
         $openTasks = $website->marketingTasks()->whereIn('status', ['pending', 'in_progress'])->get();
         $priorities = $actions->reject(function ($action) use ($openTasks) {
             return $openTasks->contains(fn (MarketingTask $task) => $task->title === data_get($action->metadata, 'suggested_task', $action->title) || ($action->related_page_url && $task->related_page_url === $action->related_page_url));
@@ -26,6 +26,8 @@ class WeeklyMarketingPlanService
             'recommended_task' => data_get($action->metadata, 'suggested_task', $action->title),
             'expected_result' => $action->expected_result,
             'related_page_url' => $action->related_page_url,
+            'learning_summary' => $action->learning_summary,
+            'recommendation_confidence' => $action->confidence_score,
         ])->values()->all();
         $sync = $website->gscSyncs()->where('status', 'success')->latest('synced_at')->first();
         $unresolvedHandoffs = $website->agentHandoffs()->with(['fromAgent', 'toAgent'])->whereIn('status', ['pending', 'accepted', 'failed'])->latest()->limit(10)->get()->map(fn ($handoff) => ['from' => $handoff->fromAgent->name, 'to' => $handoff->toAgent->name, 'reason' => $handoff->reason, 'status' => $handoff->status])->all();

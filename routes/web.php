@@ -10,6 +10,7 @@ use App\Http\Controllers\AgentScheduleController;
 use App\Http\Controllers\AgentOperationsController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ActionOutcomeController;
+use App\Http\Controllers\AgentLearningController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConversionEventController;
 use App\Http\Controllers\DashboardController;
@@ -52,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/action-outcomes/{actionOutcome}/capture', [ActionOutcomeController::class, 'capture'])->name('action-outcomes.capture');
     Route::post('/action-outcomes/{actionOutcome}/evaluate', [ActionOutcomeController::class, 'evaluate'])->name('action-outcomes.evaluate');
     Route::patch('/action-outcomes/{actionOutcome}', [ActionOutcomeController::class, 'update'])->name('action-outcomes.update');
+    Route::get('/agent-learning', [AgentLearningController::class, 'index'])->name('agent-learning.index');
+    Route::patch('/agent-learning/{agentMemory}', [AgentLearningController::class, 'update'])->name('agent-learning.update');
 
     Route::get('/agents', [AgentController::class, 'index'])->name('agents.index');
     Route::get('/agents/{agent}', [AgentController::class, 'show'])->name('agents.show');

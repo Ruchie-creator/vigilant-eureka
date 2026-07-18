@@ -103,6 +103,8 @@ class ActionOutcomeService
             'evaluated_at' => now(),
         ]);
 
+        app(AgentLearningService::class)->learnFromOutcome($outcome->fresh());
+
         return $outcome->fresh();
     }
 

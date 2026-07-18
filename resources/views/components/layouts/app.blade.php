@@ -11,6 +11,7 @@
         ['label' => 'Approval Inbox', 'route' => 'approvals.index', 'matches' => ['approvals.*'], 'icon' => 'inbox'],
         ['label' => 'Agent Operations', 'route' => 'agent-operations.index', 'matches' => ['agent-operations.*'], 'icon' => 'activity'],
         ['label' => 'Action Outcomes', 'route' => 'action-outcomes.index', 'matches' => ['action-outcomes.*'], 'icon' => 'chart-no-axes-combined'],
+        ['label' => 'Agent Learning', 'route' => 'agent-learning.index', 'matches' => ['agent-learning.*'], 'icon' => 'brain-circuit'],
         ['label' => 'Agent Schedules', 'route' => 'agent-schedules.index', 'matches' => ['agent-schedules.*', 'websites.weekly-marketing-plans.*', 'weekly-marketing-plans.*'], 'icon' => 'calendar-clock'],
         ['label' => 'SEO Audits', 'route' => 'seo-audits.index', 'matches' => ['seo-audits.*'], 'icon' => 'scan-search'],
         ['label' => 'AI Insights', 'route' => 'ai-insights.index', 'matches' => ['ai-insights.*'], 'icon' => 'sparkles'],
